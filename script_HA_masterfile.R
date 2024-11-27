@@ -13,7 +13,7 @@ library(hms)
 ### Step 1: Get datalogger data, including Trec, RH, Tdb.
 ### Step 2: Get ibutton data, incuding Tsk for 4 ib.
 ### Step 3: Get CORE data, including HR, CORE Tc and Tsk.
-### Step 4: Get Polar data, including HR.
+### Step 4: Get Polar data, including HR. !!!! NEEDS WORK!!!!
 ### Step 5: Combine into 1 file.
 ### Step 6: Final cleaning steps.
 
@@ -38,15 +38,25 @@ longformat_CORE <- read_excel(paste0(here("data_output"), "/HA_longformat_CORE.x
 
 
 # STEP 4) Get Polar data ----
-# STEP 5) Merge cleaned IB data with Masterfile----
+
+# sTILL NeEEDS to BE DonE!!!!!!!!!
+
+
+# STEP 5) Merge all into 1 Masterfile----
 Masterfile <- longformat_CORE %>%
   left_join(longformat_Tsk, by = c("pp","ha", "Minutes")) %>%
-  left_join(longformat_DL, by = c("pp","ha", "Minutes"))
+  left_join(longformat_DL, by = c("pp","ha", "Minutes")) %>%
+  rename(Trec = mean_Trec, 
+         RH = mean_RH_vaisalah, 
+         Tdb = mean_T_vaisalah,
+         T_core_torso = T_core_chest,
+         T_core_torso_new = T_core_chest_new,
+         T_skin_torso = T_skin_chest)
 
 
 
 
-# STEP 5) Calculate Tbody----
+# STEP 6) Calculate Tbody----
 Masterfile <- Masterfile %>%
   mutate(Tbody = 0.8 * Trec + 0.2 * Tsk_average,
          Tbody_core_torso = 0.8 * T_core_torso + 0.2 * T_skin_torso,
@@ -56,29 +66,38 @@ Masterfile <- Masterfile %>%
 
 
 
-# STEP 6) Get Masterfile including all cleaned data. ----
-Masterfile <- read_excel(paste(here("data_output"), "/HA_Masterfile.xlsx", sep = ""),
-                         na = c("NA", "", "_", "-"))
 
-# STEP 6) Further clean data ----
-## execute pp not doing all HA-sessions.
-## Trec, I am doubting Masterfile. Have to re do.
-## Tsk, Recently done. Should be good. 
-## HR 
+# STEP 7) Further clean data ----
+## Think which pp to exclude depending on RQ. 
+## Exclude when protocol deviated or Trec data is likely measurement error (N = 2)
+## Exclude no-shows (N=5)
 ## HR < 40, make NA because unlikely physiologically.
 ## HR < 100 after cycling for 10 minutes, make NA because unlikely physiologically.
 ## CORE with HR is NA, make NA because HR used as input parameter.
-pp_to_exclude <- c(2, 3, 4, 5, 6, 10, 13, 22, 24)
+
+
+### Likely measurement error or deviation from first 45 minutes protocol 
+## p18_ha1_trec data lot of missing and abnormally high values (Trec > 40) exclude this session.
+## p4_ha4_trec and other data, she was just sitting in chamber due to injury. Exclude this session. Later drop-out.
+exclude <- data.frame(pp = c(3,18),
+                      ha = c(4,1))
+
+### No-show pp
+noshows <- c(5, 6, 13, 22, 24)
 
 Masterfile <- Masterfile %>%
-  mutate(Avg_HR_torso = ifelse(Avg_HR_torso < 40, NA, 
-                               ifelse(Avg_HR_torso < 100 & Minutes >= 25 & Minutes <= 45, NA, Avg_HR_torso)),
-         T_core_torso = ifelse(is.na(Avg_HR_torso), NA, T_core_torso),
-         T_core_hand = ifelse(is.na(Avg_HR_torso), NA, T_core_hand),
-         T_skin_torso = ifelse(is.na(Avg_HR_torso), NA, T_skin_torso),
-         T_skin_hand = ifelse(is.na(Avg_HR_torso), NA, T_skin_hand)
-  ) %>%
-  filter(!pp %in% pp_to_exclude)
+  mutate(HR_core = ifelse(HR_core < 40, NA, 
+                          ifelse(HR_core < 100 & Minutes >= 25 & Minutes <= 45, NA, HR_core)),
+         T_core_torso = ifelse(is.na(HR_core), NA, T_core_torso),
+         T_core_hand = ifelse(is.na(HR_core), NA, T_core_hand),
+         T_skin_torso = ifelse(is.na(HR_core), NA, T_skin_torso),
+         T_skin_hand = ifelse(is.na(HR_core), NA, T_skin_hand)) %>%
+  filter(!pp %in% noshows) %>%  # Remove pp who did not show up at all
+  anti_join(exclude, by = c("pp", "ha"))  # Exclude sessions which deviated from protocol
+
+
+
+
 
 
 
