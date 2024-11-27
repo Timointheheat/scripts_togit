@@ -165,4 +165,4 @@ for (participant in pp_value) {
 # Step 4: save as excel----
 write.xlsx(longformat_CORE,
            file = file.path(paste0(here("data_output"), 
-                                   "/HA_longformat_CORE")))
+                                   "/HA_longformat_CORE.xlsx")))
