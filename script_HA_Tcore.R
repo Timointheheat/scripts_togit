@@ -9,12 +9,14 @@ library(hms)
 library(lubridate)
 
 
-## TEMP did loading + subsetting for 1 file.
-## Make this work for all CORE files. By
-### Creating similar loop as with Tsk cleaning.
-### Create 1 longformat Tcore file
+## !!README!!README!!README!!
+## Script used to download & filter data and save into longformat. 
+### Step 1: Get scoreform data to get start/ end time of test.
+### Step 2: Create empty longformat.
+### Step 3: For-loop to download chest and hand CORE-data for each session. Also filter data based on start/ end times
+### Step 4: Save into file.
 
-# Step : get scoreform with start/ end times ----
+# Step 1: get scoreform with start/ end times ----
 scoreform_HA <- read_excel(here("data_raw/Scoreform_excel_HA.xlsx"), na = c("NA", "", "_", "-")) %>%
   dplyr::select(pp, nmbr_test, time_start_15, time_start_TDextra, tm_start, tm_end) %>%
   mutate(time_start_45 = time_start_15,
@@ -26,12 +28,12 @@ scoreform_HA <- read_excel(here("data_raw/Scoreform_excel_HA.xlsx"), na = c("NA"
          time_end_ch = tm_end)
 
 
-# Step : create empty longformat ----
+# Step 2: create empty longformat ----
 longformat_CORE <- data.frame()
 
 
 
-# Step : add each file to longformat_CORE ---- 
+# Step 3: add each file to longformat_CORE ---- 
 pp_value <- c(1:25)
 testname <- c("ha1", "ha2", "ha3", "ha4", "ha5", "ha6", "ha7", "ha8", "ha9")
 
@@ -39,8 +41,13 @@ for (participant in pp_value) {
   for (test in 1:NROW(testname)){
     
     ## Empty dataframes to be sure
+    averaged_hand <- NULL
+    averaged_chest <- NULL
     averaged_CORE <- NULL
-    
+    temp <- NULL
+    temp2 <- NULL
+    filtered <- NULL
+    filtered2 <- NULL
     
     ## Create dynamic file names
     filename_chest <- paste("/p", participant, "_", testname[test], "_CORE_chest", ".csv", sep = "")
@@ -87,7 +94,7 @@ for (participant in pp_value) {
     } else {
       
       ### If file does not exist, create an empty dataframe
-      temp <- data.frame(Minutes = c(1:166), timestamp = rep(NA, 166), T_core_chest = rep(NA, 166), 
+      averaged_chest <- data.frame(Minutes = c(1:166), timestamp = rep(NA, 166), T_core_chest = rep(NA, 166), 
                          T_core_chest_new = rep(NA, 166), T_skin_chest = rep(NA, 166), HR = rep(NA, 166))
     }
     
@@ -132,7 +139,8 @@ for (participant in pp_value) {
     } else {
       
       ### If file does not exist, create an empty dataframe
-      temp2<- data.frame(Minutes = c(1:166), timestamp = rep(NA, 166), T_core_hand = rep(NA, 166), T_core_hand_new = rep(NA, 166))
+      averaged_hand <- data.frame(Minutes = c(1:166), timestamp = rep(NA, 166), T_core_hand = rep(NA, 166), 
+                                  T_core_hand_new = rep(NA, 166), T_skin_hand = rep(NA, 166))
       
     }
     
@@ -148,31 +156,13 @@ for (participant in pp_value) {
     
     longformat_CORE <- rbind(longformat_CORE, averaged_CORE)
     
-    
   }
 }
 
 
 
-test <- read.csv(paste(here("data_cleaned"), "/p1_ha1_CORE_chest.csv", sep = "")) %>%
-  rename(Date.time = "time..UTC.OFS..0100.",
-         T_core = "cbt..mC.",
-         T_core_new = "CBT_NEW_MODEL..mC.") %>%
-  mutate(Date.time = sub("\\..*", "", Date.time))%>%                          # Delete unexpected ".11" etc
-  mutate(date = as.POSIXct(substr(Date.time, 1, 10), format = "%Y-%m-%d"),
-         time = as_hms(substr(Date.time, 12, 19))) %>%                        # Convert to useable timestamps
-  mutate(T_core = T_core/1000,
-         T_core_new = T_core_new/1000,) %>%                                   # Convert to Tc
-  dplyr::select(time, T_core, T_core_new)
 
-times <- scoreform_HA[scoreform_HA$pp == 1 & scoreform_HA$nmbr_test == 1,]
-
-filtered <- test %>%
-  filter(time >= times$time_start_45 & time <= times$time_end_ch)
-
-temp <- filtered %>%
-  mutate(minute = as_hms(round(as.numeric(time) / 60) * 60)) %>%              # Get times towards closes minutes
-  group_by(minute) %>%
-  summarise(across(c(T_core, T_core_new), mean, na.rm = TRUE)) %>%            # Calculate mean for each minute
-  ungroup() %>%
-  dplyr::select(minute, T_core, T_core_new) 
+# Step 4: save as excel----
+write.xlsx(longformat_CORE,
+           file = file.path(paste0(here("data_output"), 
+                                   "/HA_longformat_CORE")))
