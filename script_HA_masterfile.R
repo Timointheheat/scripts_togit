@@ -15,7 +15,9 @@ library(hms)
 ### Step 3: Get CORE data, including HR, CORE Tc and Tsk.
 ### Step 4: Get Polar data, including HR. !!!! NEEDS WORK!!!!
 ### Step 5: Combine into 1 file.
-### Step 6: Final cleaning steps.
+### Step 6: calculate Tbody
+### Step 7: Final cleaning steps.
+### Step 8: save masterfile as xlsx
 
 
 # STEP 1) Get partially cleaned DL data -----
@@ -99,7 +101,10 @@ Masterfile <- Masterfile %>%
 
 
 
-
+# STEp 8) save masterfile ----
+write.xlsx(Masterfile,
+           file = file.path(paste0(here("data_output"), 
+                                   "/HA_Masterfile.xlsx")))
 
 
 # STEP 7) Get data into right format for analyses----
