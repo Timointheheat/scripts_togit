@@ -7,49 +7,56 @@ library(openxlsx)
 library(stringr)
 library(hms)
 
-# Do Step 1-3 only once. For further analyses go to step 4.
-# STEP 1) Get Masterfile Pooh with cleaned Tre and HR ----
-Masterfile <- read_excel(paste(here("data_cleaned"), "/Masterfile CORE + Trec.xlsx", sep = ""),
-                         na = c("NA", "", "_", "-")) %>%
-  mutate(session = str_remove(session, "ha"),
-         ha = as.numeric(session),
-         participant = str_remove(participant, "p"),
-         pp = as.numeric(participant),
-         Date.Time = time,
-         T_skin_torso = as.numeric(Avg_T_skin_torso),
-         T_core_torso = as.numeric(Avg_T_core_torso),
-         T_skin_hand = as.numeric(Avg_T_skin_hand),
-         T_core_hand = as.numeric(Avg_T_core_hand),
-         Trec = as.numeric(mean_Trec)) %>%
-  group_by(pp, ha) %>%
-  # mutate(Minutes = row_number(),
-  #        Minutes = as.numeric(Minutes)) %>%
-  ungroup() %>%
-  dplyr::select(pp, ha, Date.Time, T_skin_torso, T_core_torso, T_skin_hand, T_core_hand, Trec, Avg_HR_torso)
+## !!README!!README!!README!!
+## Script used to combine longformat files of Trec (partially cleaned), Tsk (cleaned), CORE (raw) and Polar HR (raw) data.
+## Additionally, final cleaning of data is done.
+### Step 1: Get datalogger data, including Trec, RH, Tdb.
+### Step 2: Get ibutton data, incuding Tsk for 4 ib.
+### Step 3: Get CORE data, including HR, CORE Tc and Tsk.
+### Step 4: Get Polar data, including HR.
+### Step 5: Combine into 1 file.
+### Step 6: Final cleaning steps.
+
+
+# STEP 1) Get partially cleaned DL data -----
+longformat_DL <- read_excel(paste0(here("data_output"), "/HA_longformat_DL.xlsx")) %>%
+  dplyr::select(!Time)
+  
+
 
 # STEP 2) Get cleaned IB data ----
-longformat_Tsk <- read_excel(paste0(here("data_output"), "/HA_longformat_Tsk")) %>%
-  mutate(ha = hst,
-         Date.Time = Date.Time - 1) %>%
-  dplyr::select(!hst)
+longformat_Tsk <- read_excel(paste0(here("data_output"), "/HA_longformat_Tsk.xlsx")) %>%
+  mutate(Minutes = Minutes -1) %>%                    # Reduce by 1 minute as this starts at t = 1 instead of t = 0
+  mutate(ha = hst) %>%
+  dplyr::select(!c(hst, Date.Time, time))
 
-# STEP 3) Merge cleaned IB data with Masterfile----
-Masterfile <- longformat_Tsk %>%
-  left_join(Masterfile, by = c("pp","ha", "Date.Time"))
-
-write.xlsx(Masterfile,
-           file = file.path(paste0(here("data_output"), 
-                                   "/HA_Masterfile.xlsx")))
+# STEP 3) Get RAW CORE data ----
+longformat_CORE <- read_excel(paste0(here("data_output"), "/HA_longformat_CORE.xlsx")) 
 
 
 
-# STEP 4) Calculate Tbody----
+
+
+# STEP 4) Get Polar data ----
+# STEP 5) Merge cleaned IB data with Masterfile----
+Masterfile <- longformat_CORE %>%
+  left_join(longformat_Tsk, by = c("pp","ha", "Minutes")) %>%
+  left_join(longformat_DL, by = c("pp","ha", "Minutes"))
+
+
+
+
+# STEP 5) Calculate Tbody----
 Masterfile <- Masterfile %>%
   mutate(Tbody = 0.8 * Trec + 0.2 * Tsk_average,
          Tbody_core_torso = 0.8 * T_core_torso + 0.2 * T_skin_torso,
-         Tbody_core_hand = 0.8 * T_core_hand + 0.2 * T_skin_hand)
+         Tbody_core_hand = 0.8 * T_core_hand + 0.2 * T_skin_hand,
+         Tbody_core_torso_new = 0.8 * T_core_torso_new + 0.2 * T_skin_torso,
+         Tbody_core_hand_new = 0.8 * T_core_hand_new + 0.2 * T_skin_hand)
 
-# STEP 5) Get Masterfile including all cleaned data. ----
+
+
+# STEP 6) Get Masterfile including all cleaned data. ----
 Masterfile <- read_excel(paste(here("data_output"), "/HA_Masterfile.xlsx", sep = ""),
                          na = c("NA", "", "_", "-"))
 
