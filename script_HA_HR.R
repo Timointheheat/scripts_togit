@@ -8,12 +8,11 @@ library(stringr)
 library(hms)
 library(lubridate)
 
-
 ## !!README!!README!!README!!
 ## Script used to download & filter data and save into longformat. 
 ### Step 1: Get scoreform data to get start/ end time of test.
 ### Step 2: Create empty longformat.
-### Step 3: For-loop to download chest and hand CORE-data for each session. Also filter data based on start/ end times
+### Step 3: For-loop to download HR-data for each session. Also filter data based on start/ end times. If delay in start, make adjustments.
 ### Step 4: Save into file.
 
 # Step 1: get scoreform with start/ end times ----
@@ -33,7 +32,7 @@ longformat_HR <- data.frame()
 
 
 
-# Step 3: add each file to longformat_CORE ---- 
+# Step 3: load, subset and add each file to longformat_HR ---- 
 pp_value <- c(1:25)
 testname <- c("ha1", "ha2", "ha3", "ha4", "ha5", "ha6", "ha7", "ha8", "ha9")
 
@@ -47,6 +46,8 @@ for (participant in pp_value) {
     timediff <- NULL
     starttime <- NULL
     times <- NULL
+    tocombinetoHR <- NULL
+
     
     ## Create dynamic file names
     filename <- paste("/p", participant, "_", testname[test], "_hr.csv", sep = "")
@@ -91,8 +92,23 @@ for (participant in pp_value) {
         ### IF difference between start time Polar and starttime we wrote down is larger than 2 min. provide error. 
         if (timediff > 120 | timediff < -120) {
           # If time difference is too large print a statement and create a NA value column
-          print(paste("pp", participant, "sessie", test, "big time diff of", timediff))
-          averaged_HR <- data.frame(Minutes = c(1:166), HR = rep(NA, 166))
+          print(paste("pp", participant, "sessie", test, "big time diff of", timediff, "corrected for by making start minutes NA"))
+          # calculate amount of empty rows to account for delay.
+          emptyrows <- abs(round(timediff/60))
+          averaged_HR <- data.frame(Minutes = c(1:emptyrows), HR = rep(NA, emptyrows))
+          
+          # create temp variable
+          tocombinetoHR <- temp %>%
+            mutate(Minutes = round(as.numeric(time)/60)) %>%
+            group_by(Minutes) %>%
+            summarise(HR = round(mean(HR, na.rm = TRUE))) %>%
+            ungroup() %>%
+            dplyr::select(Minutes, HR)
+          
+          # use temp file and empty file to create averaged_HR. Additionally, change Minutes column. 
+          averaged_HR <- rbind(averaged_HR, tocombinetoHR) %>%
+            mutate(Minutes = row_number() - 1)
+          
         }else{
           
           ### average over 1 minute
@@ -125,12 +141,20 @@ for (participant in pp_value) {
   }
 }
  
+
+## 
       
       
       
 
     
     
+
+
+# TEMP STEP: remove p8_ha2 ----
+longformat_HR <- longformat_HR %>%
+  filter(!(pp == 8 & ha == 2)) %>%    # Not sure if this is correct file
+  filter(!(pp == 3 & ha == 4))        # Did different procol (only sitting)
 
 # Step 4: save as excel----
 write.xlsx(longformat_HR,
