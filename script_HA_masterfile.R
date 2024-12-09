@@ -20,7 +20,7 @@ library(hms)
 ### Step 8: save masterfile as xlsx
 
 
-# STEP 1) Get partially cleaned DL data -----
+# STEP 1) Get cleaned DL data -----
 longformat_DL <- read_excel(paste0(here("data_output"), "/HA_longformat_DL.xlsx")) %>%
   dplyr::select(!Time)
   
@@ -39,15 +39,17 @@ longformat_CORE <- read_excel(paste0(here("data_output"), "/HA_longformat_CORE.x
 
 
 
-# STEP 4) Get Polar data ----
+# STEP 4) Get RAW Polar data ----
 
-# sTILL NeEEDS to BE DonE!!!!!!!!!
+longformat_Polar <- read_excel(paste0(here("data_output"), "/HA_longformat_HR.xlsx")) %>%
+  rename(HR_polar = HR)
 
 
 # STEP 5) Merge all into 1 Masterfile----
 Masterfile <- longformat_CORE %>%
   left_join(longformat_Tsk, by = c("pp","ha", "Minutes")) %>%
   left_join(longformat_DL, by = c("pp","ha", "Minutes")) %>%
+  left_join(longformat_Polar, by = c("pp","ha", "Minutes")) %>%
   rename(Trec = mean_Trec, 
          RH = mean_RH_vaisalah, 
          Tdb = mean_T_vaisalah,
@@ -65,6 +67,8 @@ Masterfile <- Masterfile %>%
          Tbody_core_hand = 0.8 * T_core_hand + 0.2 * T_skin_hand,
          Tbody_core_torso_new = 0.8 * T_core_torso_new + 0.2 * T_skin_torso,
          Tbody_core_hand_new = 0.8 * T_core_hand_new + 0.2 * T_skin_hand)
+
+
 
 
 
@@ -104,7 +108,7 @@ Masterfile <- Masterfile %>%
 # STEp 8) save masterfile ----
 write.xlsx(Masterfile,
            file = file.path(paste0(here("data_output"), 
-                                   "/HA_Masterfile.xlsx")))
+                                   "/HA_Masterfile_raw.xlsx")))
 
 
 # STEP 7) Get data into right format for analyses----
