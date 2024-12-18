@@ -17,7 +17,7 @@ library(lubridate)
 ### Step 4: Save into file.
 
 # Step 1: get scoreform with start/ end times ----
-scoreform_HA <- read_excel(here("data_raw/Scoreform_excel_HA.xlsx"), na = c("NA", "", "_", "-")) %>%
+scoreform_HA <- read_excel(here("data/Scoreform_excel_HA.xlsx"), na = c("NA", "", "_", "-")) %>%
   dplyr::select(pp, nmbr_test, time_start_15, time_start_TDextra, tm_start, tm_end) %>%
   mutate(time_start_45 = time_start_15,
          time_end_45 = time_start_15 + minutes(45),                                                      # End time of 45 min block
@@ -40,6 +40,7 @@ testname <- c("ha1", "ha2", "ha3", "ha4", "ha5", "ha6", "ha7", "ha8", "ha9")
 for (participant in pp_value) {
   for (test in 1:NROW(testname)){
     
+
     ## Empty dataframes to be sure
     averaged_hand <- NULL
     averaged_chest <- NULL
@@ -54,10 +55,10 @@ for (participant in pp_value) {
     filename_hand <- paste("/p", participant, "_", testname[test], "_CORE_hand", ".csv", sep = "")
     
     ## CHEST: Check if file exists & do all subsetting
-    if(file.exists(paste(here("data_raw_foranalysis/CORE_rawdata_newAlgorithm/"), filename_chest, sep = ""))) {
+    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/newnew/chest/"), filename_chest, sep = ""))) {
       
       ### Download data + extract right columns
-      temp <- read.csv(paste(here("data_raw_foranalysis/CORE_rawdata_newAlgorithm/"), 
+      temp <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/newnew/chest/"), 
                              filename_chest, sep = "")) %>%
         rename(Date.time = "time..UTC.OFS..0100.",
                T_core = "cbt..mC.",
@@ -99,10 +100,10 @@ for (participant in pp_value) {
     }
     
     ## HAND: Check if file exists & do all subsetting
-    if(file.exists(paste(here("data_raw_foranalysis/CORE_rawdata_newAlgorithm/"), filename_hand, sep = ""))) {
+    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/newnew/wrist/"), filename_hand, sep = ""))) {
       
       ### Download data + extract right columns
-      temp2 <- read.csv(paste(here("data_raw_foranalysis/CORE_rawdata_newAlgorithm/"), 
+      temp2 <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/newnew/wrist/"), 
                              filename_hand, sep = "")) %>%
         rename(Date.time = "time..UTC.OFS..0100.",
                T_core = "cbt..mC.",
@@ -164,5 +165,5 @@ for (participant in pp_value) {
 
 # Step 4: save as excel----
 write.xlsx(longformat_CORE,
-           file = file.path(paste0(here("data_output"), 
-                                   "/HA_longformat_CORE.xlsx")))
+           file = file.path(paste0(here("data/data_output"), 
+                                   "/HA_longformat_CORE_18122024.xlsx")))
