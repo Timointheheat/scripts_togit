@@ -21,19 +21,19 @@ library(hms)
 
 
 # STEP 1) Get cleaned DL data -----
-longformat_DL <- read_excel(paste0(here("data_output"), "/HA_longformat_DL.xlsx")) %>%
+longformat_DL <- read_excel(paste0(here("data/data_output"), "/HA_longformat_DL.xlsx")) %>%
   dplyr::select(!Time)
   
 
 
 # STEP 2) Get cleaned IB data ----
-longformat_Tsk <- read_excel(paste0(here("data_output"), "/HA_longformat_Tsk.xlsx")) %>%
+longformat_Tsk <- read_excel(paste0(here("data/data_output"), "/HA_longformat_Tsk.xlsx")) %>%
   mutate(Minutes = Minutes -1) %>%                    # Reduce by 1 minute as this starts at t = 1 instead of t = 0
   mutate(ha = hst) %>%
   dplyr::select(!c(hst, Date.Time, time))
 
 # STEP 3) Get RAW CORE data ----
-longformat_CORE <- read_excel(paste0(here("data_output"), "/HA_longformat_CORE.xlsx")) 
+longformat_CORE <- read_excel(paste0(here("data/data_output"), "/HA_longformat_CORE_18122024.xlsx")) 
 
 
 
@@ -41,7 +41,7 @@ longformat_CORE <- read_excel(paste0(here("data_output"), "/HA_longformat_CORE.x
 
 # STEP 4) Get RAW Polar data ----
 
-longformat_Polar <- read_excel(paste0(here("data_output"), "/HA_longformat_HR.xlsx")) %>%
+longformat_Polar <- read_excel(paste0(here("data/data_output"), "/HA_longformat_HR.xlsx")) %>%
   rename(HR_polar = HR)
 
 
@@ -107,8 +107,8 @@ Masterfile <- Masterfile %>%
 
 # STEp 8) save masterfile ----
 write.xlsx(Masterfile,
-           file = file.path(paste0(here("data_output"), 
-                                   "/HA_Masterfile_raw.xlsx")))
+           file = file.path(paste0(here("data/data_output"), 
+                                   "/HA_Masterfile_raw_18122024.xlsx")))
 
 
 # STEP 7) Get data into right format for analyses----
