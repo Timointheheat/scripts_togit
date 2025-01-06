@@ -10,7 +10,7 @@ library(lubridate)
 
 
 ## !!README!!README!!README!!
-## Script used to download & filter data and save into longformat. 
+## Script used to download & filter data and save into longformat. Data from new_chest_algorithm is used. 
 ### Step 1: Get scoreform data to get start/ end time of test.
 ### Step 2: Create empty longformat.
 ### Step 3: For-loop to download chest and hand CORE-data for each session. Also filter data based on start/ end times
@@ -51,26 +51,27 @@ for (participant in pp_value) {
     filtered2 <- NULL
     
     ## Create dynamic file names
-    filename_chest <- paste("/p", participant, "_", testname[test], "_CORE_chest", ".csv", sep = "")
-    filename_hand <- paste("/p", participant, "_", testname[test], "_CORE_hand", ".csv", sep = "")
+    filename_chest <- paste("/p", participant, "_", testname[test], "_core_torso_newAlgo", ".csv", sep = "")
+    filename_hand <- paste("/p", participant, "_", testname[test], "_core_hand_newAlgo", ".csv", sep = "")
     
     ## CHEST: Check if file exists & do all subsetting
-    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/newnew/chest/"), filename_chest, sep = ""))) {
+    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/new_sports_chest_algorithm/"),
+                         filename_chest, sep = ""))) {
       
       ### Download data + extract right columns
-      temp <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/newnew/chest/"), 
+      temp <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/new_sports_chest_algorithm/"), 
                              filename_chest, sep = "")) %>%
-        rename(Date.time = "time..UTC.OFS..0100.",
-               T_core = "cbt..mC.",
-               T_core_new = "CBT_NEW_MODEL..mC.",
-               T_skin = "temp_a0..mC.",
-               HR = "hr") %>%
+        rename(Date.time = "Timestamp",
+               T_core = "old_cbt",
+               T_core_new = "new_cbt",
+               T_skin = "skin_temp",
+               HR = "heart_rate") %>%
         mutate(Date.time = sub("\\..*", "", Date.time))%>%                          # Delete unexpected ".11" etc
         mutate(date = as.POSIXct(substr(Date.time, 1, 10), format = "%Y-%m-%d"),
                time = as_hms(substr(Date.time, 12, 19))) %>%                        # Convert to useable timestamps
-        mutate(T_core_chest = T_core/1000,
-               T_core_chest_new = T_core_new/1000,
-               T_skin_chest = T_skin / 1000,
+        mutate(T_core_chest = T_core,
+               T_core_chest_new = T_core_new,
+               T_skin_chest = T_skin,
                HR = as.numeric(HR)) %>%                                   # Convert to Tc
         dplyr::select(time, T_core_chest, T_core_chest_new, T_skin_chest, HR)
       
@@ -100,22 +101,23 @@ for (participant in pp_value) {
     }
     
     ## HAND: Check if file exists & do all subsetting
-    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/newnew/wrist/"), filename_hand, sep = ""))) {
+    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/new_sports_chest_algorithm/"),
+                         filename_hand, sep = ""))) {
       
       ### Download data + extract right columns
-      temp2 <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/newnew/wrist/"), 
+      temp2 <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/new_sports_chest_algorithm/"), 
                              filename_hand, sep = "")) %>%
-        rename(Date.time = "time..UTC.OFS..0100.",
-               T_core = "cbt..mC.",
-               T_core_new = "CBT_NEW_MODEL..mC.",
-               T_skin = "temp_a0..mC.",
-               HR = "hr") %>%
+        rename(Date.time = "Timestamp",
+               T_core = "old_cbt",
+               T_core_new = "new_cbt",
+               T_skin = "skin_temp",
+               HR = "heart_rate") %>%
         mutate(Date.time = sub("\\..*", "", Date.time))%>%                          # Delete unexpected ".11" etc
         mutate(date = as.POSIXct(substr(Date.time, 1, 10), format = "%Y-%m-%d"),
                time = as_hms(substr(Date.time, 12, 19))) %>%                        # Convert to useable timestamps
-        mutate(T_core_hand = T_core/1000,
-               T_core_hand_new = T_core_new/1000,
-               T_skin_hand = T_skin / 1000,
+        mutate(T_core_hand = T_core,
+               T_core_hand_new = T_core_new,
+               T_skin_hand = T_skin,
                HR = as.numeric(HR)) %>%                                   # Convert to Tc
         dplyr::select(time, T_core_hand, T_core_hand_new, T_skin_hand, HR)
       
@@ -166,4 +168,4 @@ for (participant in pp_value) {
 # Step 4: save as excel----
 write.xlsx(longformat_CORE,
            file = file.path(paste0(here("data/data_output"), 
-                                   "/HA_longformat_CORE_18122024.xlsx")))
+                                   "/HA_longformat_CORE_06012025.xlsx")))
