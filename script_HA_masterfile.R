@@ -33,7 +33,7 @@ longformat_Tsk <- read_excel(paste0(here("data/data_output"), "/HA_longformat_Ts
   dplyr::select(!c(hst, Date.Time, time))
 
 # STEP 3) Get RAW CORE data ----
-longformat_CORE <- read_excel(paste0(here("data/data_output"), "/HA_longformat_CORE_18122024.xlsx")) 
+longformat_CORE <- read_excel(paste0(here("data/data_output"), "/HA_longformat_CORE_06012025.xlsx")) 
 
 
 
@@ -108,10 +108,13 @@ Masterfile <- Masterfile %>%
 # STEp 8) save masterfile ----
 write.xlsx(Masterfile,
            file = file.path(paste0(here("data/data_output"), 
-                                   "/HA_Masterfile_raw_18122024.xlsx")))
+                                   "/HA_Masterfile_raw_06012025.xlsx")))
 
 
-# STEP 7) Get data into right format for analyses----
+
+# STEP9: PLAYING AROUND FROM HERE ON -----
+
+# PLAY) Get data into right format for analyses----
 ## Get average values for Tsk and Trec and Tcore in rest (min 10-15) and constant exercise (min 40-45)
 Means <- Masterfile %>%
   group_by(pp, ha) %>%
@@ -162,7 +165,7 @@ Changes %>%
     exercise_sd = sd(Tsk_average[Minutes >= 30 & Minutes <= 45], na.rm = TRUE)
   )
 
-# TO DISPLAY -----
+# PLAY) TO DISPLAY -----
 Masterfile_constant <- Masterfile %>%
   filter(Minutes >=0 & Minutes <= 45)
 
