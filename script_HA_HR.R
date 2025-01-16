@@ -16,7 +16,7 @@ library(lubridate)
 ### Step 4: Save into file.
 
 # Step 1: get scoreform with start/ end times ----
-scoreform_HA <- read_excel(here("data_raw/Scoreform_excel_HA.xlsx"), na = c("NA", "", "_", "-")) %>%
+scoreform_HA <- read_excel(here("data/Scoreform_excel_HA.xlsx"), na = c("NA", "", "_", "-")) %>%
   dplyr::select(pp, nmbr_test, time_start_15, time_start_TDextra, tm_start, tm_end) %>%
   mutate(time_start_45 = time_start_15,
          time_end_45 = time_start_15 + minutes(45),                                                      # End time of 45 min block
@@ -53,10 +53,10 @@ for (participant in pp_value) {
     filename <- paste("/p", participant, "_", testname[test], "_hr.csv", sep = "")
     
     ## CHEST: Check if file exists & do all subsetting
-    if(file.exists(paste(here("data_raw_foranalysis/"), "/p", participant, "/",  filename, sep = ""))) {
+    if(file.exists(paste(here("data/data_raw_foranalysis/"), "/p", participant, "/",  filename, sep = ""))) {
       
       ### Download data + get starttime watch + extract right columns
-      temp <- read.csv(paste(here("data_raw_foranalysis/"), "/p", participant, "/", 
+      temp <- read.csv(paste(here("data/data_raw_foranalysis/"), "/p", participant, "/", 
                              filename, sep = ""))
       
       #### Skip if HR sensor was not working and gave FALSE values.
@@ -151,10 +151,18 @@ for (participant in pp_value) {
     
 
 
-# TEMP STEP: remove p8_ha2 ----
+# TEMP STEP: change deviations from protocol ----
+## Did different procol (only sitting)
 longformat_HR <- longformat_HR %>%
-  filter(!(pp == 8 & ha == 2)) %>%    # Not sure if this is correct file
-  filter(!(pp == 3 & ha == 4))        # Did different procol (only sitting)
+  mutate(HR = ifelse(pp == 3 & ha == 4, is.na(HR), HR))        
+
+## Shift HR data to 11 minutes earlier.
+longformat_HR <- longformat_HR %>%
+  group_by(pp, ha) %>%
+  mutate(HR = ifelse(pp == 12 & ha == 1, lead(HR, 11), HR)) %>%
+  ungroup()     
+
+
 
 # Step 4: save as excel----
 write.xlsx(longformat_HR,
