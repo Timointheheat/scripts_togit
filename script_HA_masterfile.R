@@ -33,7 +33,7 @@ longformat_Tsk <- read_excel(paste0(here("data/data_output"), "/HA_longformat_Ts
   dplyr::select(!c(hst, Date.Time, time))
 
 # STEP 3) Get RAW CORE data ----
-longformat_CORE <- read_excel(paste0(here("data/data_output"), "/HA_longformat_CORE_06012025.xlsx")) 
+longformat_CORE <- read_excel(paste0(here("data/data_output"), "/HA_longformat_CORE_22012025.xlsx")) 
 
 
 
@@ -73,14 +73,75 @@ Masterfile <- Masterfile %>%
 
 
 
-# STEP 7) Further clean data ----
-## Think which pp to exclude depending on RQ. 
-## Exclude when protocol deviated or Trec data is likely measurement error (N = 2)
-## Exclude no-shows (N=5)
-## HR < 40, make NA because unlikely physiologically.
-## HR < 100 after cycling for 10 minutes, make NA because unlikely physiologically.
-## CORE with HR is NA, make NA because HR used as input parameter.
+# STEP 7) Clean data ----
+## A) Exclude pp not executing protocol right or Trec data is likely measurement error (N = 3) 
+## B) Use cleaning rules derived from visual inspection of all individual data. Saved in excel. 
 
+
+## B) Exclude when protocol deviated or Trec data is likely measurement error (N = 2)
+## C) Exclude no-shows (N=5)
+## D) HR < 40, make NA because unlikely physiologically.
+## E) HR < 100 after cycling for 10 minutes, make NA because unlikely physiologically.
+## F) CORE with HR is NA, make NA because HR used as input parameter.
+
+## A) exclude pp not executing protocol right
+exclude <- data.frame(pp = c(3,16,18),
+                      ha = c(4,9,1))
+
+Masterfile_cleaned <- Masterfile %>% 
+  anti_join(exclude, by = c("pp", "ha"))
+
+
+
+## B) Individual  cleaning rules based on visual inspection
+### 1) Load cleaning rules
+cleaningRules <- read_excel(
+  paste(here(), "/HR_CORE_TREC_cleaning_marked_sections.xlsx", sep = ""),)
+
+### 2) cleaning loop
+pp_value <- c(1:25)
+testname <- c("ha1", "ha2", "ha3", "ha4", "ha5", "ha6", "ha7", "ha8", "ha9")
+
+for (rownumber in 1:NROW(cleaningRules)) {
+  
+  # Reset data frames
+  temp <- NULL
+  participant <- NULL
+  session <-NULL
+  sensor <- NULL
+  colname <- NULL
+  rule <- NULL
+  
+  # add new values
+  participant <- cleaningRules$Participant[rownumber]
+  session <- cleaningRules$Session[rownumber]
+  sensor <- cleaningRules$'Sensor ID'[rownumber]
+  rule <- cleaningRules$'action suggestion'[rownumber]
+  
+  # change name of sensor into column names
+  colname <- ifelse(sensor == "CORE_torso", "T_core_torso_new",
+                    ifelse(sensor == "CORE_hand", "T_core_hand_new",
+                    ifelse(sensor == "HR", "HR_polar", sensor)))
+  
+  # exract data that needs cleaning
+  temp <- Masterfile_cleaned %>% filter(pp == participant & ha == session) %>% dplyr::select(pp, ha, Minutes, colname)
+
+  
+  if (rule == "leave it" | rule == "add it, done" | rule == "done" | rule == "added" | rule == "excluded already"){
+    # Do nothing 
+  } elseif (rule == "exclude") {
+    # If data cannot be trusted, make values NA. (N = 1)
+    Masterfile_cleaned <- Masterfile_cleaned %>%
+      mutate(!!sym(colname) := if_else(pp == participant & ha == session, NA, .data[[colname]]))
+  } elseif (rule == "cut it") {
+    # Interpolate data if some small issues within test
+    start <- cleaningRules$`Start min`[rownumber]-1
+    end <- cleaningRules$`End min`[rownumber]+1
+    
+    ### THIS IS WERE IT GOT STUCK
+  }
+  
+  
 
 ### Likely measurement error or deviation from first 45 minutes protocol 
 ## p18_ha1_trec data lot of missing and abnormally high values (Trec > 40) exclude this session.
@@ -108,7 +169,7 @@ Masterfile <- Masterfile %>%
 # STEp 8) save masterfile ----
 write.xlsx(Masterfile,
            file = file.path(paste0(here("data/data_output"), 
-                                   "/HA_Masterfile_raw_06012025.xlsx")))
+                                   "/HA_Masterfile_raw_2212025.xlsx")))
 
 
 
