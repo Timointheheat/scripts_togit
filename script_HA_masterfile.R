@@ -47,17 +47,15 @@ longformat_Polar <- read_excel(paste0(here("data/data_output"), "/HA_longformat_
 
 # STEP 5) Merge all into 1 Masterfile----
 Masterfile <- longformat_CORE %>%
-  left_join(longformat_Tsk, by = c("pp","ha", "Minutes")) %>%
-  left_join(longformat_DL, by = c("pp","ha", "Minutes")) %>%
-  left_join(longformat_Polar, by = c("pp","ha", "Minutes")) %>%
+  full_join(longformat_Tsk, by = c("pp", "ha", "Minutes")) %>%
+  full_join(longformat_DL, by = c("pp", "ha", "Minutes")) %>%
+  full_join(longformat_Polar, by = c("pp", "ha", "Minutes")) %>%
   rename(Trec = mean_Trec, 
          RH = mean_RH_vaisalah, 
          Tdb = mean_T_vaisalah,
          T_core_torso = T_core_chest,
          T_core_torso_new = T_core_chest_new,
          T_skin_torso = T_skin_chest)
-
-
 
 
 # STEP 6) Calculate Tbody----
@@ -76,15 +74,14 @@ Masterfile <- Masterfile %>%
 # STEP 7) Clean data ----
 ## A) Exclude pp not executing protocol right or Trec data is likely measurement error (N = 3) 
 ## B) Use cleaning rules derived from visual inspection of all individual data. Saved in excel. 
-
-
-## B) Exclude when protocol deviated or Trec data is likely measurement error (N = 2)
-## C) Exclude no-shows (N=5)
-## D) HR < 40, make NA because unlikely physiologically.
-## E) HR < 100 after cycling for 10 minutes, make NA because unlikely physiologically.
-## F) CORE with HR is NA, make NA because HR used as input parameter.
+## C) Remove non-physiological values: 
+### HR < 40 during entire test & HR < 100 after cycling for 10 minutes, make NA because unlikely physiologically.
+### Make CORE NA if HR is NA. Make CORE na if Tcore < 35 or > 40 degrees.
+## D) CURRENTLY NOT APPLIEDExclude no-shows (N=5)
 
 ## A) exclude pp not executing protocol right
+## p18_ha1_trec data lot of missing and abnormally high values (Trec > 40) exclude this session.
+## p4_ha4_trec and other data, she was just sitting in chamber due to injury. Exclude this session. Later drop-out.
 exclude <- data.frame(pp = c(3,16,18),
                       ha = c(4,9,1))
 
@@ -111,6 +108,8 @@ for (rownumber in 1:NROW(cleaningRules)) {
   sensor <- NULL
   colname <- NULL
   rule <- NULL
+  start <- NULL
+  end <- NULL
   
   # add new values
   participant <- cleaningRules$Participant[rownumber]
@@ -124,284 +123,90 @@ for (rownumber in 1:NROW(cleaningRules)) {
                     ifelse(sensor == "HR", "HR_polar", sensor)))
   
   # exract data that needs cleaning
-  temp <- Masterfile_cleaned %>% filter(pp == participant & ha == session) %>% dplyr::select(pp, ha, Minutes, colname)
+  #temp <- Masterfile_cleaned %>% filter(pp == participant & ha == session) %>% dplyr::select(pp, ha, Minutes, colname)
 
   
-  if (rule == "leave it" | rule == "add it, done" | rule == "done" | rule == "added" | rule == "excluded already"){
+  if (rule == "leave it" | rule == "add it, done" | rule == "done" | rule == "added" | rule == "excluded already"  | rule == "timeshift, done"){
     # Do nothing 
-  } elseif (rule == "exclude") {
+  
+    } else if (rule == "exclude") {
     # If data cannot be trusted, make values NA. (N = 1)
     Masterfile_cleaned <- Masterfile_cleaned %>%
       mutate(!!sym(colname) := if_else(pp == participant & ha == session, NA, .data[[colname]]))
-  } elseif (rule == "cut it") {
-    # Interpolate data if some small issues within test
-    start <- cleaningRules$`Start min`[rownumber]-1
-    end <- cleaningRules$`End min`[rownumber]+1
+  
+    } else if (rule == "cut it") {
+    # Make data NA if some small parts contain invalid data.
+    start <- cleaningRules$`Start min`[rownumber]
+    end <- cleaningRules$`End min`[rownumber]
+    Masterfile_cleaned <- Masterfile_cleaned %>%
+      mutate(!!sym(colname) := if_else(pp == participant & ha == session & Minutes >= start & Minutes <= end, 
+                                       NA, .data[[colname]]))
     
-    ### THIS IS WERE IT GOT STUCK
-  }
+    } else if (rule == "interpolate") {
+      # Interpolate as a small part contains questionable data with clear correct data surrounding (N=5)
+      start <- cleaningRules$`Start min`[rownumber]-1
+      end <- cleaningRules$`End min`[rownumber]+1
+      start_value <- Masterfile_cleaned %>% filter(pp == participant & ha == session & Minutes == start) %>% pull(!!sym(colname))
+      end_value <- Masterfile_cleaned %>% filter(pp == participant & ha == session & Minutes == end) %>% pull(!!sym(colname))
+      Masterfile_cleaned <- Masterfile_cleaned %>%
+        mutate(!!sym(colname) := if_else(pp == participant & ha == session & Minutes > start & Minutes < end,
+                                         start_value + (end_value - start_value) * (Minutes - start) / (end - start),
+                                         .data[[colname]]))
+    }}
+
   
-  
-
-### Likely measurement error or deviation from first 45 minutes protocol 
-## p18_ha1_trec data lot of missing and abnormally high values (Trec > 40) exclude this session.
-## p4_ha4_trec and other data, she was just sitting in chamber due to injury. Exclude this session. Later drop-out.
-exclude <- data.frame(pp = c(3,18),
-                      ha = c(4,1))
-
-### No-show pp
-noshows <- c(5, 6, 13, 22, 24)
-
-Masterfile <- Masterfile %>%
+## C) HR removal of unphysiological values
+Masterfile_cleaned <- Masterfile_cleaned %>%
   mutate(HR_core = ifelse(HR_core < 40, NA, 
-                          ifelse(HR_core < 100 & Minutes >= 25 & Minutes <= 45, NA, HR_core)),
+                          ifelse(HR_core < 100 & Minutes >= 16 & Minutes <= 46, NA, HR_core)),
+         HR_polar = ifelse(HR_polar < 40, NA, 
+                          ifelse(HR_polar < 100 & Minutes >= 16 & Minutes <= 46, NA, HR_polar)),
          T_core_torso = ifelse(is.na(HR_core), NA, T_core_torso),
          T_core_hand = ifelse(is.na(HR_core), NA, T_core_hand),
+         T_core_torso = ifelse(T_core_torso < 35, NA, 
+                                   ifelse(T_core_torso > 40, NA, T_core_torso)),
+         T_core_hand = ifelse(T_core_hand < 35, NA, 
+                                  ifelse(T_core_hand > 40, NA, T_core_hand)),
          T_skin_torso = ifelse(is.na(HR_core), NA, T_skin_torso),
-         T_skin_hand = ifelse(is.na(HR_core), NA, T_skin_hand)) %>%
-  filter(!pp %in% noshows) %>%  # Remove pp who did not show up at all
+         T_skin_hand = ifelse(is.na(HR_core), NA, T_skin_hand),
+         T_core_torso_new = ifelse(is.na(HR_core), NA, T_core_torso_new),
+         T_core_hand_new = ifelse(is.na(HR_core), NA, T_core_hand_new),
+         T_core_torso_new = ifelse(T_core_torso_new < 35, NA, 
+                          ifelse(T_core_torso_new > 40, NA, T_core_torso_new)),
+         T_core_hand_new = ifelse(T_core_hand_new < 35, NA, 
+                                   ifelse(T_core_hand_new > 40, NA, T_core_hand_new)),
+         
+  ) %>%
   anti_join(exclude, by = c("pp", "ha"))  # Exclude sessions which deviated from protocol
+
+
+### D) CURRENTLY NOT APPLIED. No-show pp
+#noshows <- c(5, 6, 13, 22, 24)
+# Masterfile_cleaned <- Masterfile_cleaned %>%
+#   filter(!pp %in% noshows) %>%  # Remove pp who did not show up at all
+
 
 
 
 
 
 # STEp 8) save masterfile ----
+write.xlsx(Masterfile_cleaned,
+           file = file.path(paste0(here("data/data_output"), 
+                                   "/HA_Masterfile_cleaned_2412025.xlsx")))
 write.xlsx(Masterfile,
            file = file.path(paste0(here("data/data_output"), 
-                                   "/HA_Masterfile_raw_2212025.xlsx")))
+                                   "/HA_Masterfile_raw_2412025.xlsx")))
 
 
 
-# STEP9: PLAYING AROUND FROM HERE ON -----
-
-# PLAY) Get data into right format for analyses----
-## Get average values for Tsk and Trec and Tcore in rest (min 10-15) and constant exercise (min 40-45)
-Means <- Masterfile %>%
-  group_by(pp, ha) %>%
-  summarise(
-    Trec_rest_mean = mean(Trec[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
-    Tcore_torso_rest_mean = mean(T_core_torso[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
-    Tcore_hand_rest_mean = mean(T_core_hand[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
-    Trec_ex_mean = mean(Trec[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
-    Tcore_torso_ex_mean = mean(T_core_torso[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
-    Tcore_hand_ex_mean = mean(T_core_hand[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
-    )
-
-
-Changes_overHA <- Means %>%
-  group_by(pp) %>%
-  mutate(
-    dTrec_rest_mean = Trec_rest_mean - first(Trec_rest_mean),
-    dTcore_torso_rest_mean = Tcore_torso_rest_mean - first(Tcore_torso_rest_mean),
-    dTcore_hand_rest_mean = Tcore_hand_rest_mean - first(Tcore_hand_rest_mean),
-    dTrec_ex_mean = Trec_ex_mean - first(Trec_ex_mean),
-    dTcore_torso_ex_mean = Tcore_torso_ex_mean - first(Tcore_torso_ex_mean),
-    dTcore_hand_ex_mean = Tcore_hand_ex_mean - first(Tcore_hand_ex_mean)
-  ) %>%
-  filter(!ha ==1)
-
-Filtered_Changes <- Changes_overHA %>%
-  mutate(Difference = Tcore_hand_rest_mean - Tcore_torso_rest_mean)
-
-
-hist(Changes_overHA)
-
-plot(Changes_overHA$dTcore_hand_ex_mean, Changes_overHA$dTcore_torso_ex_mean)
-
-Changes %>%
-  ggplot(aes(x = as.factor(ha), y = dTcore_hand_ex_mean, group = pp)) +
-  geom_point()
-           
-         
 
 
 
-  average_Tsk <- Masterfile %>%
-  group_by(pp,ha) %>%
-  summarise(
-    rest_mean = mean(Tsk_average[Minutes >= 9 & Minutes <= 14], na.rm = TRUE),
-    rest_sd = sd(Tsk_average[Minutes >= 9 & Minutes <= 14], na.rm = TRUE),
-    exercise_mean = mean(Tsk_average[Minutes >= 30 & Minutes <= 45], na.rm = TRUE),
-    exercise_sd = sd(Tsk_average[Minutes >= 30 & Minutes <= 45], na.rm = TRUE)
-  )
-
-# PLAY) TO DISPLAY -----
-Masterfile_constant <- Masterfile %>%
-  filter(Minutes >=0 & Minutes <= 45)
-
-#[Masterfile_constant$pp == 23 & Masterfile_constant$ha == 2,]
-
-Masterfile %>%   
-  ggplot(aes(x = Minutes, y = Tsk_average)) + #, color = as.factor(ha))) +
-  geom_point(color = "blue", alpha = 0.1) +
-  geom_vline(xintercept = 15, color = "red", linetype = "dashed", size = 1) +
-  geom_vline(xintercept = 45, color = "red", linetype = "dashed", size = 1) 
-
-  
-# -----  
-Masterfile_constant %>%
-  filter(pp == 23 & ha == 2) %>%
-  dplyr::select(pp, Date.Time, Minutes, ha, Avg_HR_torso, Trec)%>%
-  print(n = 50)
-
-# Get info out of masterfile ----
-Masterfile[Masterfile$Minutes >= 25 & Masterfile$Minutes <= 30,] %>%
-  group_by(ha) %>%
-  ggplot(aes(x = Trec, y = T_core_torso)) +
-  geom_point() +  
-  geom_smooth(method = "loess", se = TRUE, color = "red")
-
-Masterfile %>%
-ggplot(aes(x = Trec, y = T_core_torso )) +
-  geom_point()+ 
-  geom_smooth(method = "loess", se = TRUE, color = "red") 
-  
-
-cor(Masterfile$ib_3, Masterfile$T_skin_hand,use = "complete.obs")
-
-average_Tsk <- Masterfile %>%
-  group_by(pp,ha) %>%
-  summarise(
-    rest_mean = mean(Tsk_average[Minutes >= 9 & Minutes <= 14], na.rm = TRUE),
-    rest_sd = sd(Tsk_average[Minutes >= 9 & Minutes <= 14], na.rm = TRUE),
-    exercise_mean = mean(Tsk_average[Minutes >= 30 & Minutes <= 45], na.rm = TRUE),
-    exercise_sd = sd(Tsk_average[Minutes >= 30 & Minutes <= 45], na.rm = TRUE)
-  )
-
-ppt_theme <- function() {
-  theme_bw() +
-    theme(
-      text = element_text(size = 40),
-      axis.line = element_line(linewidth = 3, color = "#066666"),
-      panel.border = element_blank(),
-      #title =  element_text(size = 40), # Adjust  title size
-      axis.title = element_text(size = 35), # Adjust axis title size
-      axis.text = element_text(size = 35),  # Adjust axis text size
-      axis.ticks = element_line(size = 2),  # Adjust axis tick thickness
-      axis.ticks.length = unit(0.5, "cm"), # Adjust tick length here
-      plot.title = element_text(size = 18, margin = margin(b = 20))
-    )
-}
-
-average_Tsk <- average_Tsk %>%
-  mutate(ha = as.factor(hst)) 
-
-Masterfile %>%
-  filter(Minutes >= 35 & Minutes <= 40) %>%
-  ggplot(aes(x = as.factor(ha))) +
-  stat_summary(aes(y = Trec, group = 1, color = "Trec"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = Trec, group = 1, color = "Trec"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = Trec, group = 1, fill = "Trec"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_core_torso, group = 2, color = "T_core_torso"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_core_torso, group = 2, color = "T_core_torso"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_core_torso, group = 2, fill = "T_core_torso"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_core_hand, group = 3, color = "T_core_hand"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_core_hand, group = 3, color = "T_core_hand"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_core_hand, group = 3, fill = "T_core_hand"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  labs(title = "Core temp last 5 min of exercise",
-       x = "HA-session",
-       y = "Core temp",
-       color = "Variable",
-       fill = "Variable") +
-  scale_color_manual(values = c("Trec" = "orange", "T_core_torso" = "blue", "T_core_hand" = "gray")) +
-  scale_fill_manual(values = c("Trec" = "orange", "T_core_torso" = "blue", "T_core_hand" = "gray"))
 
 
-Masterfile %>%
-  filter(Minutes >= 10 & Minutes <= 15) %>%
-  ggplot(aes(x = as.factor(ha))) +
-  stat_summary(aes(y = Trec, group = 1, color = "Trec"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = Trec, group = 1, color = "Trec"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = Trec, group = 1, fill = "Trec"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_core_torso, group = 2, color = "T_core_torso"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_core_torso, group = 2, color = "T_core_torso"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_core_torso, group = 2, fill = "T_core_torso"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_core_hand, group = 3, color = "T_core_hand"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_core_hand, group = 3, color = "T_core_hand"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_core_hand, group = 3, fill = "T_core_hand"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  labs(title = "Core temp last 5 min of SITTING",
-       x = "HA-session",
-       y = "Core temp",
-       color = "Variable",
-       fill = "Variable") +
-  scale_color_manual(values = c("Trec" = "orange", "T_core_torso" = "blue", "T_core_hand" = "gray")) +
-  scale_fill_manual(values = c("Trec" = "orange", "T_core_torso" = "blue", "T_core_hand" = "gray"))
-
-Masterfile %>%
-  filter(Minutes >= 35 & Minutes <= 40) %>%
-  ggplot(aes(x = as.factor(ha))) +
-  stat_summary(aes(y = Tsk_average, group = 1, color = "IB"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = Tsk_average, group = 1, color = "IB"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = Tsk_average, group = 1, fill = "IB"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_skin_torso, group = 2, color = "T_skin_torso"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_skin_torso, group = 2, color = "T_skin_torso"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_skin_torso, group = 2, fill = "T_skin_torso"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_skin_hand, group = 3, color = "T_skin_hand"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_skin_hand, group = 3, color = "T_skin_hand"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_skin_hand, group = 3, fill = "T_skin_hand"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  labs(title = "SKIN temp last 5 min of exercise",
-       x = "HA-session",
-       y = "Skin temp",
-       color = "Variable",
-       fill = "Variable") +
-  scale_color_manual(values = c("IB" = "orange", "T_skin_torso" = "blue", "T_skin_hand" = "gray")) +
-  scale_fill_manual(values = c("IB" = "orange", "T_skin_torso" = "blue", "T_skin_hand" = "gray"))
 
 
-Masterfile %>%
-  filter(Minutes >= 40 & Minutes <= 45) %>%
-  ggplot(aes(x = as.factor(ha))) +
-  stat_summary(aes(y = Avg_HR_torso, group = 1), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = Avg_HR_torso, group = 1), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = Avg_HR_torso, group = 1), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  labs(title = "HR last 5 min of exercise",
-       x = "HA-session",
-       y = "HR")
-
-
-Masterfile %>%
-  filter(Minutes >= 10 & Minutes <= 15) %>%
-  ggplot(aes(x = as.factor(ha))) +
-  stat_summary(aes(y = Avg_HR_torso, group = 1), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = Avg_HR_torso, group = 1), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = Avg_HR_torso, group = 1), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  labs(title = "HR last 5 min of sitting",
-       x = "HA-session",
-       y = "HR")
-
-
-average_Tsk %>%
-  # group_by(hst) %>%
-  ggplot(aes(x = ha, y = exercise_mean, group = "pp")) +
-  geom_point() +
-  stat_summary(fun = mean, geom = "point", shape = 16, size = 4, color = "orange") +
-  stat_summary(fun.data = mean_se, geom = "ribbon", alpha = 0.1, fill = "orange") +
-  stat_summary(fun = mean, geom = "line", color = "orange", linetype = "solid", size = 1) +
-  labs(title = "Tsk exercise across HA-period")  
-  
-
-Masterfile %>%
-  filter(Minutes >= 9 & Minutes <= 13) %>%
-  ggplot(aes(x = as.factor(ha))) +
-  stat_summary(aes(y = Tsk_average, group = 1, color = "IB"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = Tsk_average, group = 1, color = "IB"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = Tsk_average, group = 1, fill = "IB"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_skin_torso, group = 2, color = "T_skin_torso"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_skin_torso, group = 2, color = "T_skin_torso"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_skin_torso, group = 2, fill = "T_skin_torso"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  stat_summary(aes(y = T_skin_hand, group = 3, color = "T_skin_hand"), fun = mean, geom = "point", shape = 16, size = 4) +
-  stat_summary(aes(y = T_skin_hand, group = 3, color = "T_skin_hand"), fun = mean, geom = "line", linetype = "solid", size = 1) +
-  stat_summary(aes(y = T_skin_hand, group = 3, fill = "T_skin_hand"), fun.data = mean_se, geom = "ribbon", alpha = 0.1) +
-  labs(title = "SKIN temp last 5 min of sitting",
-       x = "HA-session",
-       y = "Skin temp",
-       color = "Variable",
-       fill = "Variable") +
-  scale_color_manual(values = c("IB" = "orange", "T_skin_torso" = "blue", "T_skin_hand" = "gray")) +
-  scale_fill_manual(values = c("IB" = "orange", "T_skin_torso" = "blue", "T_skin_hand" = "gray"))
-
-  
 
 plot_ind_changes <- function(data, variable, unit) {
 
