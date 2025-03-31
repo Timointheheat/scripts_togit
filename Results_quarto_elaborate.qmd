@@ -29,8 +29,8 @@ library(zoo)
 #| echo: false
 #| include: false
 
-# STEP 1) Load  Masterfile and exclude pp ----
-Masterfile <- read_excel(paste0(here("data/data_output"), "/HA_Masterfile_cleaned_2412025.xlsx")) 
+# STEP 1) Load  Masterfile and exclude pp and CHOOSE RIGHT alogirthm----
+Masterfile <- read_excel(paste0(here("data/data_output"), "/HA_Masterfile_cleaned_31032025.xlsx")) 
 
 ## p5, p6, p13, p24 did not show up, exclude
 Masterfile <- Masterfile %>%
@@ -42,6 +42,11 @@ Masterfile <- Masterfile %>%
 ## pp25 HA1 Trec data: measurement error, exclude. 
 Masterfile <- Masterfile %>%
   mutate(Trec = ifelse(pp == 25 & ha == 1, NA, Trec))
+
+## Choosing which algorithm to use? Mutate that to ..new (because that is used in the rest of the script)
+Masterfile <- Masterfile %>%
+  mutate(T_core_torso_new = T_core_torso,
+         T_core_hand_new = T_core_hand_new)
 
 
 # STEP 2) Answer if CORE can be used to track HA-adaptations ----
@@ -309,11 +314,11 @@ pairwise_comparisons_ha_dTc_ex <- contrast(emm_ha_dTc_ex, method = "trt.vs.ctrl"
 
 # model_dTsk_rest <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_rest)
 # emm_ha_dTsk_rest <- emmeans(model_dTsk_rest, ~ ha | device)
-# pairwise_comparisons_ha_dTsk_rest <- contrast(emm_ha_dTsk_rest, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")  
+# pairwise_comparisons_ha_dTsk_rest <- contrast(emm_ha_dTsk_rest, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
 # 
 # model_dTsk_ex <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_ex)
 # emm_ha_dTsk_ex <- emmeans(model_dTsk_ex, ~ ha | device)
-# pairwise_comparisons_ha_dTsk_ex <- contrast(emm_ha_dTsk_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")  
+# pairwise_comparisons_ha_dTsk_ex <- contrast(emm_ha_dTsk_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
 
 
 # STEP X) RQ: time spend above 38.5----
@@ -672,10 +677,12 @@ A significant interaction effect of HA and Device on dTc during rest was found, 
 
 Specifically, dTc in rest measured using the rectal probe was significantly reduced for HA8 (t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[15], digits = 4)`) and HA9 ((t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[16], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[16], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[16], digits = 4)`)) when compared to HA1, while the dTc in rest estimated using the CRS did not significantly change throughout the HA-protocol. Surprisingly, no significant change was seen in dTc during exercise estimated using the rectal probe or CRS.
 
-Additionally, dTsk during exercise measured using the IB was significantly reduced for HA6 ((t(`r round(summary(pairwise_comparisons_ha_dTsk_ex)$df[13], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$t.ratio[13], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$p.value[13], digits = 4)`)) and HA8 ((t(`r round(summary(pairwise_comparisons_ha_dTsk_ex)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$p.value[15], digits = 4)`)) when compared to HA1, while the dTsk during exercise estimated using the CRS did not change throughout the HA-protocol. Surprisingly, no significant change was seen in dTsk during rest estimated using the IB (or CRS).
+
 
 ```{r}
 #| echo: false
+# 
+# Additionally, dTsk during exercise measured using the IB was significantly reduced for HA6 ((t(`r round(summary(pairwise_comparisons_ha_dTsk_ex)$df[13], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$t.ratio[13], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$p.value[13], digits = 4)`)) and HA8 ((t(`r round(summary(pairwise_comparisons_ha_dTsk_ex)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$p.value[15], digits = 4)`)) when compared to HA1, while the dTsk during exercise estimated using the CRS did not change throughout the HA-protocol. Surprisingly, no significant change was seen in dTsk during rest estimated using the IB (or CRS).
 
 knitr::kable(results_df_mmANOVA, col.names = c("Variable", "Interaction", "Main effect HA"))
 ```

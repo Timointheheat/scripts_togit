@@ -101,11 +101,11 @@ for (participant in pp_value) {
     }
     
     ## HAND: Check if file exists & do all subsetting
-    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/new_sports_chest_algorithm/"),
+    if(file.exists(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/wrist_switching_algorithm/"),
                          filename_hand, sep = ""))) {
       
       ### Download data + extract right columns
-      temp2 <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/new_sports_chest_algorithm/"), 
+      temp2 <- read.csv(paste(here("data/CORE_rawdata_newAlgorithm/20241220_newnewnew/wrist_switching_algorithm/"), 
                              filename_hand, sep = "")) %>%
         rename(Date.time = "Timestamp",
                T_core = "old_cbt",
@@ -168,4 +168,4 @@ for (participant in pp_value) {
 # Step 4: save as excel----
 write.xlsx(longformat_CORE,
            file = file.path(paste0(here("data/data_output"), 
-                                   "/HA_longformat_CORE_22012025.xlsx")))
+                                   "/HA_longformat_CORE_31032025.xlsx")))
