@@ -84,6 +84,15 @@ for (participant in pp_value) {
       filtered <- temp %>%
         filter(time >= times$time_start_45 & time <= times$time_end_ch)
       
+      
+      ### remove 0-values because they are non-physiological
+      filtered <- filtered %>%
+        mutate(T_core_chest = ifelse(T_core_chest == 0, NA, T_core_chest),
+               T_core_chest_new = ifelse(T_core_chest_new == 0, NA, T_core_chest_new),
+               T_skin_chest = ifelse(T_skin_chest == 0, NA, T_skin_chest))
+      
+      
+      
       ### average over 1 minute
       averaged_chest <- filtered %>%
         mutate(timestamp = as_hms(round(as.numeric(time) / 60) * 60))%>%              # Get times towards closes minutes
