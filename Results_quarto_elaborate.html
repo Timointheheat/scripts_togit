@@ -141,15 +141,15 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="ha-adaptations" class="level2">
 <h2 class="anchored" data-anchor-id="ha-adaptations">HA-adaptations</h2>
-<p>A significant interaction effect of HA and Device on dTc during rest was found, F(8 , 184 ) = 4.71 , P = 2.89^{-5} , ges = 0.11 . No significant interaction was found on dTc during exercise. A significant main effect of HA on dTc during rest and exercise and a significant main effect of device on dTc during rest was found (P &lt; 0.05).</p>
-<p>Specifically, dTc in rest measured using the rectal probe was significantly reduced for HA8 (t(204) = -4.13 , P = 4^{-4}) and HA9 ((t(205) = -4.93 , P = 0)) when compared to HA1, while the dTc in rest estimated using the CRS did not significantly change throughout the HA-protocol. Surprisingly, no significant change was seen in dTc during exercise estimated using the rectal probe or CRS.</p>
+<p>The assumption of sphericity was violated for dTc during rest (W = 0.174, P = ANOVA_results_dTc_rest$“Mauchly’s Test for Sphericity”[2,3]`), therefore Greenhouse-Geisser corrected values are reported for dTc during resting. A significant interaction effect of HA and Device on dTc during rest was found, F(6.03, 138.75) = 5.31 , P = 5.63^{-5} , ges = 0.1. No significant interaction was found on dTc during exercise. A significant main effect of HA on dTc during rest and exercise was found (P &lt; 0.05).</p>
+<p>Specifically, dTc in rest measured using the rectal probe was significantly reduced for HA8 (t(204) = -5 , P = 0) and HA9 ((t(204) = -5.97 , P = 0)) when compared to HA1, while the dTc in rest estimated using the CRS did not significantly change throughout the HA-protocol. Additionally, dTc during exercise measured using the rectal probe was significantly reduced for HA7 (t(204) = -2.87 , P = 0.0363) , HA8 (t(204) = -3.27 , P = 0.0102) and HA9 ((t(204) = -3.28 , P = 0.0097)) when compared to HA1, while the dTc during exercise estimated using the CRS did not significantly change throughout the HA-protocol.</p>
 <div class="cell">
 <div class="cell-output-display">
 <table class="table table-sm table-striped small">
 <colgroup>
 <col style="width: 10%">
 <col style="width: 44%">
-<col style="width: 45%">
+<col style="width: 44%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -161,8 +161,8 @@ ul.task-list li input[type="checkbox"] {
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">dTc_rest</td>
-<td style="text-align: left;">F(8, 184) = 4.708, P = 2.89e-05 ES = 0.11</td>
-<td style="text-align: left;">F(8, 184) = 3.737, P = 0.000447 ES = 0.089</td>
+<td style="text-align: left;">F(8, 184) = 5.313, P = 5.24e-06 ES = 0.105</td>
+<td style="text-align: left;">F(8, 184) = 7.312, P = 2.01e-08 ES = 0.139</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">dTc_ex</td>
@@ -228,10 +228,10 @@ ul.task-list li input[type="checkbox"] {
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">dTc_rest_mean</td>
-<td style="text-align: right;">-0.09</td>
-<td style="text-align: right;">-0.75</td>
-<td style="text-align: right;">0.56</td>
-<td style="text-align: right;">-0.05</td>
+<td style="text-align: right;">-0.11</td>
+<td style="text-align: right;">-0.64</td>
+<td style="text-align: right;">0.41</td>
+<td style="text-align: right;">0.09</td>
 <td style="text-align: left;">poor</td>
 </tr>
 <tr class="even">
@@ -301,7 +301,7 @@ ul.task-list li input[type="checkbox"] {
 <p><img src="Results_quarto_elaborate_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
-<p>The ICC of the CRS to estimate Tc compared to the rectal probe is 0.81 (95% CI: 0.8-0.82), F(1.8334^{4}, 1624.5) = 9.72, p = 0, indicating good reliability. The Bland-Altman plot is shown below. The mean bias was -0.07 C with limits of agreement from -0.91 to 0.77 C. The negative value of the mean bias indicates that the CRS typically overestimated Tc compared to the rectal probe.</p>
+<p>The ICC of the CRS to estimate Tc compared to the rectal probe is 0.81 (95% CI: 0.8-0.82), F(1.8327^{4}, 1586.1) = 9.73, p = 0, indicating good reliability. The Bland-Altman plot is shown below. The mean bias was -0.07 C with limits of agreement from -0.91 to 0.77 C. The negative value of the mean bias indicates that the CRS typically overestimated Tc compared to the rectal probe.</p>
 <p>The ICC of the CRS to estimate Tsk compared to IB is 0.73 (95% CI: 0.5-0.83), F(1.8247^{4}, 17.3) = 8.35, p = 3.2702^{-6}, indicating moderate reliability. The Bland-Altman plot is shown below. The mean bias was -0.44 C with limits of agreement from -1.86 to 0.97 C. The negative value of the mean bias indicates that the CRS typically overestimated Tsk compared to IB.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -320,7 +320,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="criterion-validity-torso-vs-wrist" class="level2">
 <h2 class="anchored" data-anchor-id="criterion-validity-torso-vs-wrist">Criterion validity torso vs wrist</h2>
-<p>The ICC of the CRS on the wrist to estimate Tc compared to the CRS on the torso is 0.89 (95% CI: 0.89-0.89), F(1.8571^{4}, 1.37072^{4}) = 17.3, p = 0, indicating good reliability. The Bland-Altman plot is shown below. The mean bias was -0.02 C with limits of agreement from -0.58 to 0.54 C. The negative value of the mean bias indicates that the CRS on the wrist typically overestimated Tc compared to the CRS on the torso.</p>
+<p>The ICC of the CRS on the wrist to estimate Tc compared to the CRS on the torso is 0.89 (95% CI: 0.89-0.89), F(1.8564^{4}, 1.38806^{4}) = 17.34, p = 0, indicating good reliability. The Bland-Altman plot is shown below. The mean bias was -0.02 C with limits of agreement from -0.58 to 0.54 C. The negative value of the mean bias indicates that the CRS on the wrist typically overestimated Tc compared to the CRS on the torso.</p>
 <p>The ICC of the CRS to estimate Tsk compared to IB is 0.79 (95% CI: 0.78-0.8), F(1.8821^{4}, 1878.1) = 8.77, p = 0, indicating good reliability. The Bland-Altman plot is shown below. The mean bias was 0.14 C with limits of agreement from -1.56 to 1.84 C. The positive value of the mean bias indicates that the CRS on the wrist typically underestimated Tsk compared to CRS on the torso.</p>
 <div class="cell">
 <div class="cell-output-display">

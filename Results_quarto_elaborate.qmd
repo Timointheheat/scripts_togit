@@ -43,6 +43,14 @@ Masterfile <- Masterfile %>%
 Masterfile <- Masterfile %>%
   mutate(Trec = ifelse(pp == 25 & ha == 1, NA, Trec))
 
+## pp15 HA2 CORE warm-up error, wrong data until min20, exclude. 
+Masterfile <- Masterfile %>%
+  mutate(T_core_torso = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_torso),
+         T_core_torso_new = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_torso_new),
+         T_core_hand = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_hand),
+         T_core_hand_new = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_hand_new))
+
+
 ## Choosing which algorithm to use? Mutate that to ..new (because that is used in the rest of the script)
 Masterfile <- Masterfile %>%
   mutate(T_core_torso_new = T_core_torso,
@@ -312,13 +320,13 @@ model_dTc_ex <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = lo
 emm_ha_dTc_ex <- emmeans(model_dTc_ex, ~ ha | device)
 pairwise_comparisons_ha_dTc_ex <- contrast(emm_ha_dTc_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")  
 
-# model_dTsk_rest <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_rest)
-# emm_ha_dTsk_rest <- emmeans(model_dTsk_rest, ~ ha | device)
-# pairwise_comparisons_ha_dTsk_rest <- contrast(emm_ha_dTsk_rest, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
-# 
-# model_dTsk_ex <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_ex)
-# emm_ha_dTsk_ex <- emmeans(model_dTsk_ex, ~ ha | device)
-# pairwise_comparisons_ha_dTsk_ex <- contrast(emm_ha_dTsk_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
+model_dTsk_rest <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_rest)
+emm_ha_dTsk_rest <- emmeans(model_dTsk_rest, ~ ha | device)
+pairwise_comparisons_ha_dTsk_rest <- contrast(emm_ha_dTsk_rest, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
+
+model_dTsk_ex <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_ex)
+emm_ha_dTsk_ex <- emmeans(model_dTsk_ex, ~ ha | device)
+pairwise_comparisons_ha_dTsk_ex <- contrast(emm_ha_dTsk_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
 
 
 # STEP X) RQ: time spend above 38.5----
@@ -376,6 +384,20 @@ icc_inter_RQ_validity_Tsk <- ifelse(icc_RQ_validity_Tsk$value < 0.49, "poor",
 ## D) BA-analysis from package BlandAltmanLeh 
 bland.altman.plot(Masterfile$Trec, Masterfile$T_core_torso_new,
                   main="Bland Altman Plot: Trec vs CORE_torso",
+                  xlab="Means", ylab="Differences", silent=FALSE)
+
+BAresult_RQ_validity_Tc <- bland.altman.stats(Masterfile$Trec, Masterfile$T_core_torso_new, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+BAresult_RQ_validity_Tsk <- bland.altman.stats(Masterfile$Tsk_average, Masterfile$T_skin_torso, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+bland.altman.plot(Masterfile$Trec[Masterfile$Minutes < 45], Masterfile$T_core_torso_new [Masterfile$Minutes < 45],
+                  main="Bland Altman Plot: Trec vs CORE_torso first 45m",
+                  xlab="Means", ylab="Differences", silent=FALSE)
+
+bland.altman.plot(Masterfile$Trec[Masterfile$Minutes > 45], Masterfile$T_core_torso_new [Masterfile$Minutes > 45],
+                  main="Bland Altman Plot: Trec vs CORE_torso interval part",
                   xlab="Means", ylab="Differences", silent=FALSE)
 
 BAresult_RQ_validity_Tc <- bland.altman.stats(Masterfile$Trec, Masterfile$T_core_torso_new, two = 1.96, mode = 1, conf.int = 0.95)
@@ -673,9 +695,12 @@ Below are the results of my visual inspection of data normality. We have rest an
 
 ## HA-adaptations
 
-A significant interaction effect of HA and Device on dTc during rest was found, F(`r ANOVA_results_dTc_rest$ANOVA[3,2]` , `r ANOVA_results_dTc_rest$ANOVA[3,3]` ) = `r round(ANOVA_results_dTc_rest$ANOVA[3,4], digits = 2)` , P = `r round(ANOVA_results_dTc_rest$ANOVA[3,5], digits = 10)` , ges = `r round(ANOVA_results_dTc_rest$ANOVA[3,7], digits = 2)` . No significant interaction was found on dTc during exercise. A significant main effect of HA on dTc during rest and exercise and a significant main effect of device on dTc during rest was found (P \< 0.05).
+The assumption of sphericity was violated for dTc during rest (W = `r ANOVA_results_dTc_rest$"Mauchly's Test for Sphericity"[2,2]`, P = ANOVA_results_dTc_rest$"Mauchly's Test for Sphericity"[2,3]`), therefore Greenhouse-Geisser corrected values are reported for dTc during resting.  A significant interaction effect of HA and Device on dTc during rest was found, F(`r ANOVA_results_dTc_rest$"Sphericity Corrections"[2,3]`) = `r round(ANOVA_results_dTc_rest$ANOVA[3,4], digits = 2)` , P = `r round(ANOVA_results_dTc_rest$"Sphericity Corrections"[2,4], digits = 10)` , ges = `r round(ANOVA_results_dTc_rest$ANOVA[3,7], digits = 2)`. No significant interaction was found on dTc during exercise. A significant main effect of HA on dTc during rest and exercise was found (P \< 0.05).
 
-Specifically, dTc in rest measured using the rectal probe was significantly reduced for HA8 (t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[15], digits = 4)`) and HA9 ((t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[16], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[16], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[16], digits = 4)`)) when compared to HA1, while the dTc in rest estimated using the CRS did not significantly change throughout the HA-protocol. Surprisingly, no significant change was seen in dTc during exercise estimated using the rectal probe or CRS.
+
+Specifically, dTc in rest measured using the rectal probe was significantly reduced for HA8 (t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[15], digits = 4)`) and HA9 ((t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[16], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[16], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[16], digits = 4)`)) when compared to HA1, while the dTc in rest estimated using the CRS did not significantly change throughout the HA-protocol. Additionally, dTc during exercise measured using the rectal probe was significantly reduced for HA7 (t(`r round(summary(pairwise_comparisons_ha_dTc_ex)$df[14], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_ex)$t.ratio[14], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_ex)$p.value[14], digits = 4)`) , HA8 (t(`r round(summary(pairwise_comparisons_ha_dTc_ex)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_ex)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_ex)$p.value[15], digits = 4)`) and HA9 ((t(`r round(summary(pairwise_comparisons_ha_dTc_ex)$df[16], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_ex)$t.ratio[16], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_ex)$p.value[16], digits = 4)`)) when compared to HA1, while the dTc during exercise estimated using the CRS did not significantly change throughout the HA-protocol.
+
+
 
 
 
