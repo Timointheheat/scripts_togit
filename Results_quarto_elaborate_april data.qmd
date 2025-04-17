@@ -1,0 +1,915 @@
+---
+title: "CORE results april data"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+```{r setup, include = FALSE}
+# Load necessary libraries 
+library(readr)
+library(tidyr)
+library(dplyr)
+library(ggpubr)
+#library(quarto) 
+library(here)
+library(readxl)
+library(psych)
+library(rstatix)
+library(MASS)
+library(irr)
+library(BlandAltmanLeh)
+library(lme4)
+library(emmeans)
+library(zoo)
+```
+
+```{r}
+#| echo: false
+#| include: false
+
+# STEP 1) Load  Masterfile and exclude pp and CHOOSE RIGHT alogirthm----
+Masterfile <- read_excel(paste0(here("data/data_output"), "/HA_Masterfile_cleaned_17042025.xlsx")) 
+
+## p5, p6, p13, p24 did not show up, exclude
+Masterfile <- Masterfile %>%
+  filter(!pp %in% c(5, 6, 13, 24))
+
+## p2, p3, p4, p10, p22 dropped out due to a variety of reasons, 
+## excluded only from the HA-adaptations RQ, see below. 
+
+## pp25 HA1 Trec data: measurement error, exclude. 
+Masterfile <- Masterfile %>%
+  mutate(Trec = ifelse(pp == 25 & ha == 1, NA, Trec))
+
+## pp15 HA2 CORE warm-up error, wrong data until min20, exclude. 
+# Masterfile <- Masterfile %>%
+#   mutate(T_core_torso = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_torso),
+#          T_core_torso_new = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_torso_new),
+#          T_core_hand = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_hand),
+#          T_core_hand_new = ifelse(pp == 15 & ha == 2 & Minutes < 21, NA, T_core_hand_new))
+
+
+## Choosing which algorithm to use? Mutate that to ..new (because that is used in the rest of the script)
+Masterfile <- Masterfile %>%
+  mutate(T_core_torso_new = T_core_torso_consumer,
+         T_core_hand_new = T_core_hand_consumer)
+
+
+# STEP 2) Answer if CORE can be used to track HA-adaptations ----
+
+## 0) exclude people who did not finish HA-protocol or Trec measurement error
+RQ_HAadaptations_Masterfile <- Masterfile %>%
+  filter(!pp %in% c(2, 3, 4, 10, 18, 22, 25))
+
+## A) Get average values for Tsk, Trec and Tcore in rest (min 10-15) and constant exercise (min 40-45) ----
+Means <- RQ_HAadaptations_Masterfile %>%
+  group_by(pp, ha) %>%
+  summarise(
+    Tc_rec_rest_mean = mean(Trec[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    Tsk_ib_rest_mean = mean(Tsk_average[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    Tc_core_torso_rest_mean = mean(T_core_torso_new[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    Tc_core_hand_rest_mean = mean(T_core_hand_new[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    Tsk_core_torso_rest_mean = mean(T_skin_torso[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    Tsk_core_hand_rest_mean = mean(T_skin_hand[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    Tc_rec_ex_mean = mean(Trec[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
+    Tc_core_torso_ex_mean = mean(T_core_torso_new[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
+    Tc_core_hand_ex_mean = mean(T_core_hand_new[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
+    Tsk_ib_ex_mean = mean(Tsk_average[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
+    Tsk_core_torso_ex_mean = mean(T_skin_torso[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
+    Tsk_core_hand_ex_mean = mean(T_skin_hand[Minutes >= 40 & Minutes <= 45], na.rm = TRUE),
+    HR_rest_mean = mean(HR_polar[Minutes >= 10 & Minutes <= 15], na.rm = TRUE),
+    HR_ex_mean = mean(HR_polar[Minutes >= 40 & Minutes <= 45], na.rm = TRUE))
+
+
+
+## B) Get the change in values by substracting the first HA for each pp -----
+Changes_overHA <- Means %>%
+  group_by(pp) %>%
+  mutate(
+    dTc_rec_rest_mean = ifelse(ha == 1, 0, Tc_rec_rest_mean - first(Tc_rec_rest_mean)),
+    dTsk_ib_rest_mean = ifelse(ha == 1, 0, Tsk_ib_rest_mean - first(Tsk_ib_rest_mean)),
+    dTc_core_torso_rest_mean = ifelse(ha == 1, 0, Tc_core_torso_rest_mean - first(Tc_core_torso_rest_mean)),
+    dTc_core_hand_rest_mean = ifelse(ha == 1, 0, Tc_core_hand_rest_mean - first(Tc_core_hand_rest_mean)),
+    dTsk_core_torso_rest_mean = ifelse(ha == 1, 0, Tsk_core_torso_rest_mean - first(Tsk_core_torso_rest_mean)),
+    dTsk_core_hand_rest_mean = ifelse(ha == 1, 0, Tsk_core_hand_rest_mean - first(Tsk_core_hand_rest_mean)),
+    
+    dTc_rec_ex_mean = ifelse(ha == 1, 0, Tc_rec_ex_mean - first(Tc_rec_ex_mean)),
+    dTsk_ib_ex_mean = ifelse(ha == 1, 0, Tsk_ib_ex_mean - first(Tsk_ib_ex_mean)),
+    dTc_core_torso_ex_mean = ifelse(ha == 1, 0, Tc_core_torso_ex_mean - first(Tc_core_torso_ex_mean)),
+    dTc_core_hand_ex_mean = ifelse(ha == 1, 0, Tc_core_hand_ex_mean - first(Tc_core_hand_ex_mean)),
+    dTsk_core_torso_ex_mean = ifelse(ha == 1, 0, Tsk_core_torso_ex_mean - first(Tsk_core_torso_ex_mean)),
+    dTsk_core_hand_ex_mean = ifelse(ha == 1, 0, Tsk_core_hand_ex_mean - first(Tsk_core_hand_ex_mean)),
+    
+    dHR_rest_mean = ifelse(ha == 1, 0, HR_rest_mean - first(HR_rest_mean)),
+    dHR_ex_mean = ifelse(ha == 1, 0, HR_ex_mean - first(HR_ex_mean))
+  )
+
+
+
+## C) for-loop that calculates ICC and BA for all variables----
+
+variables_to_test <- c("dTc_rest_mean", "dTc_ex_mean", "dTsk_rest_mean", "dTsk_ex_mean")
+results_df <- data.frame(
+  Variable = character(),
+  Mean_Diffs = numeric(),
+  Lower_Limit = numeric(),
+  Upper_Limit = numeric(),
+  ICC_Value = numeric(),
+  ICC_Interpretation = character(),
+  stringsAsFactors = FALSE
+)
+for (variable in variables_to_test) {
+  
+  # A) Get appropriate column names
+  corefilename <- ifelse(variable == "dTc_rest_mean" ,"dTc_core_torso_rest_mean", ifelse(variable == "dTc_ex_mean" ,"dTc_core_torso_ex_mean",ifelse(variable == "dTsk_rest_mean" ,"dTsk_core_torso_rest_mean",ifelse(variable == "dTsk_ex_mean" ,"dTsk_core_torso_ex_mean","NA"))))
+  
+  recfilename <- ifelse(variable == "dTc_rest_mean" ,"dTc_rec_rest_mean", ifelse(variable == "dTc_ex_mean" ,"dTc_rec_ex_mean",ifelse(variable == "dTsk_rest_mean" ,"dTsk_ib_rest_mean",ifelse(variable == "dTsk_ex_mean" ,"dTsk_ib_ex_mean","NA"))))
+  
+  
+  # B) Filter right columns
+  filtered <- Changes_overHA %>%
+    dplyr::select(pp, ha, !!sym(recfilename), !!sym(corefilename)) %>%
+    filter(!ha == 1)
+  
+  
+  # C) Get ICC score for specific variable & interpretation 
+  icc_RQ_adaptations <- 
+    icc(cbind(filtered[[recfilename]],filtered[[corefilename]]),
+           model="twoway", type="agreement", unit="single")
+  assign(paste0("icc_RQ_adapt_", variable, ""), icc_RQ_adaptations)
+  
+  icc_inter_RQ_adaptations <- ifelse(icc_RQ_adaptations$value < 0.49, "poor", 
+                                ifelse(icc_RQ_adaptations$value > 0.5 & icc_RQ_adaptations$value < 0.75, "moderate", ifelse(icc_RQ_adaptations$value > 0.76 & icc_RQ_adaptations$value < 0.9, "good", ifelse(icc_RQ_adaptations$value > 0.91, "excellent"))))
+  assign(paste0("icc_inter_RQ_adapt_", variable, ""), icc_inter_RQ_adaptations)
+  
+  
+  
+  ## D) BA-analysis from package BlandAltmanLeh 
+BAresult_RQ_adaptations <- bland.altman.stats(filtered[[recfilename]],filtered[[corefilename]],
+                               two = 1.96, mode = 1, conf.int = 0.95)
+assign(paste0("BA_RQ_adapt_", variable, ""), BAresult_RQ_adaptations)
+
+
+  ## E) Append results to the data frame
+  results_df <- rbind(results_df, data.frame(
+    Variable = variable,
+    Mean_Diffs = round(BAresult_RQ_adaptations$mean.diffs, 2),
+    Lower_Limit = round(BAresult_RQ_adaptations$lower.limit, 2),
+    Upper_Limit = round(BAresult_RQ_adaptations$upper.limit, 2),
+    ICC_Value = round(icc_RQ_adaptations$value, 2),
+    ICC_Interpretation = icc_inter_RQ_adaptations
+  ))
+
+}
+  
+
+## D) Assess normality of data
+### Done using the function below. 
+### Only limited data was not-normaly distributed. Therefore we choose to do parametric tests. 
+
+## E) Creating long-format for the mixed-model
+### Entire Masterfile
+long_Masterfile <- Masterfile %>%
+  dplyr::select(pp, ha, Minutes, Trec, T_core_torso_new) %>%
+  pivot_longer(cols = starts_with("T"), names_to = "device", values_to = "value") %>%
+  mutate(device = ifelse(device == "Trec", "rec", "core"),
+         ha = as.factor(ha),
+         device = as.factor(device),
+         nudge_x = ifelse(device == "rec", -0.1, 0.1))
+
+
+mean_values_Tc <- long_Masterfile %>%
+  group_by(Minutes, device) %>%
+  summarise(value = mean(value, na.rm = TRUE)) %>%
+  mutate(nudge_x = ifelse(device == "rec", -0.1, 0.1))
+
+
+### Resting Core and skin
+long_dTc_rest <- Changes_overHA %>%
+  dplyr::select(pp, ha, dTc_rec_rest_mean, dTc_core_torso_rest_mean) %>%
+  pivot_longer(cols = starts_with("dTc"), names_to = "device", values_to = "value") %>%
+  mutate(pp = as.factor(pp), 
+         device = ifelse(device == "dTc_rec_rest_mean", "rec", "core"),
+         ha = as.factor(ha),
+         device = as.factor(device),
+         nudge_x = ifelse(device == "rec", -0.1, 0.1)) %>%
+  ungroup() %>%                 # Impute using average from value above and below
+  group_by(pp, device) %>%
+  mutate(value = na.approx(value, na.rm = FALSE)) %>%
+  ungroup()
+  
+
+mean_values_dTc_rest <- long_dTc_rest %>%
+  group_by(ha, device) %>%
+  summarise(value = mean(value, na.rm = TRUE)) %>%
+  mutate(nudge_x = ifelse(device == "rec", -0.1, 0.1))
+
+
+long_dTsk_rest <- Changes_overHA %>%
+  dplyr::select(pp, ha, dTsk_ib_rest_mean, dTsk_core_torso_rest_mean) %>%
+  pivot_longer(cols = starts_with("dTsk"), names_to = "device", values_to = "value") %>%
+  mutate(pp = as.factor(pp),
+         device = ifelse(device == "dTsk_ib_rest_mean", "ib", "core"),
+         ha = as.factor(ha),
+         device = as.factor(device),
+         nudge_x = ifelse(device == "ib", -0.1, 0.1))%>%
+  ungroup() %>%                 # Impute using average from value above and below
+  group_by(pp, device) %>%
+  mutate(value = na.approx(value, na.rm = FALSE)) %>%
+  ungroup()
+
+mean_values_dTsk_rest <- long_dTsk_rest %>%
+  group_by(ha, device) %>%
+  summarise(value = mean(value, na.rm = TRUE)) %>%
+  mutate(nudge_x = ifelse(device == "ib", -0.1, 0.1))
+
+
+
+### Excercising core and skin
+long_dTc_ex <- Changes_overHA %>%
+  dplyr::select(pp, ha, dTc_rec_ex_mean, dTc_core_torso_ex_mean) %>%
+  pivot_longer(cols = starts_with("dTc"), names_to = "device", values_to = "value") %>%
+  mutate(pp = as.factor(pp),
+         device = ifelse(device == "dTc_rec_ex_mean", "rec", "core"),
+         ha = as.factor(ha),
+         device = as.factor(device),
+         nudge_x = ifelse(device == "rec", -0.1, 0.1))%>%
+  ungroup() %>%                 # Impute using average from value above and below
+  group_by(pp, device) %>%
+  mutate(value = na.approx(value, na.rm = FALSE)) %>%
+  ungroup()
+
+
+mean_values_dTc_ex <- long_dTc_ex %>%
+  group_by(ha, device) %>%
+  summarise(value = mean(value, na.rm = TRUE)) %>%
+  mutate(nudge_x = ifelse(device == "rec", -0.1, 0.1))
+
+
+long_dTsk_ex <- Changes_overHA %>%
+  dplyr::select(pp, ha, dTsk_ib_ex_mean, dTsk_core_torso_ex_mean) %>%
+  pivot_longer(cols = starts_with("dTsk"), names_to = "device", values_to = "value") %>%
+  mutate(pp = as.factor(pp),
+         device = ifelse(device == "dTsk_ib_ex_mean", "ib", "core"),
+         ha = as.factor(ha),
+         device = as.factor(device),
+         nudge_x = ifelse(device == "ib", -0.1, 0.1))%>%
+  ungroup() %>%                 # Impute using average from value above and below
+  group_by(pp, device) %>%
+  mutate(value = na.approx(value, na.rm = FALSE)) %>%
+  ungroup()
+
+mean_values_dTsk_ex <- long_dTsk_ex %>%
+  group_by(ha, device) %>%
+  summarise(value = mean(value, na.rm = TRUE)) %>%
+  mutate(nudge_x = ifelse(device == "ib", -0.1, 0.1))
+
+  
+
+## F) Execute mixed-models
+ANOVA_results_dTc_rest <- anova_test(long_dTc_rest, 
+                            dv = value, 
+                            wid = pp,
+                            between = device, 
+                            within = ha)
+  
+ANOVA_results_dTc_ex <- anova_test(long_dTc_ex, 
+                            dv = value, 
+                            wid = pp,
+                            between = device, 
+                            within = ha)
+
+ANOVA_results_dTsk_rest <- anova_test(long_dTsk_rest, 
+                            dv = value, 
+                            wid = pp,
+                            between = device, 
+                            within = ha)
+
+
+ANOVA_results_dTsk_ex <- anova_test(long_dTsk_ex, 
+                            dv = value, 
+                            wid = pp,
+                            between = device, 
+                            within = ha)  
+
+
+## G) Append results to the data frame
+results_df_mmANOVA <- data.frame(
+  variable = c("dTc_rest", "dTc_ex", "dTsk_rest", "dTsk_ex"),
+  Interaction = c(paste0("F(", ANOVA_results_dTc_rest$ANOVA[3,2], ", ", ANOVA_results_dTc_rest$ANOVA[3,3], ") = ", ANOVA_results_dTc_rest$ANOVA[3,4], ", P = ", ANOVA_results_dTc_rest$ANOVA[3,5], " ES = ", ANOVA_results_dTc_rest$ANOVA[3,7]),
+    paste0("F(", ANOVA_results_dTc_ex$ANOVA[3,2], ", ", ANOVA_results_dTc_ex$ANOVA[3,3], ") = ", ANOVA_results_dTc_ex$ANOVA[3,4], ", P = ", ANOVA_results_dTc_ex$ANOVA[3,5], " ES = ", ANOVA_results_dTc_ex$ANOVA[3,7]),
+    paste0("F(", ANOVA_results_dTsk_rest$ANOVA[3,2], ", ", ANOVA_results_dTsk_rest$ANOVA[3,3], ") = ", ANOVA_results_dTsk_rest$ANOVA[3,4], ", P = ", ANOVA_results_dTsk_rest$ANOVA[3,5], " ES = ", ANOVA_results_dTsk_rest$ANOVA[3,7]),
+    paste0("F(", ANOVA_results_dTsk_ex$ANOVA[3,2], ", ", ANOVA_results_dTsk_ex$ANOVA[3,3], ") = ", ANOVA_results_dTsk_ex$ANOVA[3,4], ", P = ", ANOVA_results_dTsk_ex$ANOVA[3,5], " ES = ", ANOVA_results_dTsk_ex$ANOVA[3,7])
+  ),
+  Main_HA = c(
+    paste0("F(", ANOVA_results_dTc_rest$ANOVA[2,2], ", ", ANOVA_results_dTc_rest$ANOVA[2,3], ") = ", ANOVA_results_dTc_rest$ANOVA[2,4], ", P = ", ANOVA_results_dTc_rest$ANOVA[2,5], " ES = ", ANOVA_results_dTc_rest$ANOVA[2,7]),
+    paste0("F(", ANOVA_results_dTc_ex$ANOVA[2,2], ", ", ANOVA_results_dTc_ex$ANOVA[2,3], ") = ", ANOVA_results_dTc_ex$ANOVA[2,4], ", P = ", ANOVA_results_dTc_ex$ANOVA[2,5], " ES = ", ANOVA_results_dTc_ex$ANOVA[2,7]),
+    paste0("F(", ANOVA_results_dTsk_rest$ANOVA[2,2], ", ", ANOVA_results_dTsk_rest$ANOVA[2,3], ") = ", ANOVA_results_dTsk_rest$ANOVA[2,4], ", P = ", ANOVA_results_dTsk_rest$ANOVA[2,5], " ES = ", ANOVA_results_dTsk_rest$ANOVA[2,7]),
+    paste0("F(", ANOVA_results_dTsk_ex$ANOVA[2,2], ", ", ANOVA_results_dTsk_ex$ANOVA[2,3], ") = ", ANOVA_results_dTsk_ex$ANOVA[2,4], ", P = ", ANOVA_results_dTsk_ex$ANOVA[2,5], " ES = ", ANOVA_results_dTsk_ex$ANOVA[2,7])
+  )
+)
+  
+## H) execute post-hoc tests
+model_dTc_rest <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTc_rest)
+emm_ha_dTc_rest <- emmeans(model_dTc_rest, ~ ha | device)
+pairwise_comparisons_ha_dTc_rest <- contrast(emm_ha_dTc_rest, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
+
+model_dTc_ex <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTc_ex)
+emm_ha_dTc_ex <- emmeans(model_dTc_ex, ~ ha | device)
+pairwise_comparisons_ha_dTc_ex <- contrast(emm_ha_dTc_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")  
+
+model_dTsk_rest <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_rest)
+emm_ha_dTsk_rest <- emmeans(model_dTsk_rest, ~ ha | device)
+pairwise_comparisons_ha_dTsk_rest <- contrast(emm_ha_dTsk_rest, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
+
+model_dTsk_ex <- lmer(as.formula(paste("value ~ device * ha + (1|pp)")),data = long_dTsk_ex)
+emm_ha_dTsk_ex <- emmeans(model_dTsk_ex, ~ ha | device)
+pairwise_comparisons_ha_dTsk_ex <- contrast(emm_ha_dTsk_ex, method = "trt.vs.ctrl", ref = 1, adjust = "bonferroni")
+
+
+# STEP X) RQ: time spend above 38.5----
+## A) get right data to answer RQ
+Data_Q_ch <-  Masterfile %>%
+  filter(!is.na(Trec) & !is.na(T_core_torso_new)) %>%
+  filter(!pp == 7) %>%
+  dplyr::select(pp, ha, Trec, T_core_torso_new)
+
+## B) Calculate time above 38.5 using CORE and REC. Calculate diff.
+time_above_385 <- Data_Q_ch %>%
+  group_by(pp, ha) %>%
+  summarise(count_Trec = sum(Trec >= 38.5, na.rm = TRUE),
+            count_Tcore_torso = sum(T_core_torso_new >= 38.5, na.rm = TRUE)) %>%
+  mutate(diff = count_Trec - count_Tcore_torso)
+
+time_above <- time_above_385 %>% 
+  ungroup() %>%
+  summarise(averagetime = mean(count_Trec), sdtime = sd(count_Trec))
+
+## C) ICC from package irr
+icc_RQ_above385 <- icc(cbind(time_above_385$count_Trec, time_above_385$count_Tcore_torso),
+           model="twoway", type="agreement", unit="single")
+icc_inter_RQ_above385 <- ifelse(icc_RQ_above385$value < 0.49, "poor", 
+                                ifelse(icc_RQ_above385$value > 0.5 & icc_RQ_above385$value < 0.75, "moderate", ifelse(icc_RQ_above385$value > 0.76 & icc_RQ_above385$value < 0.9, "good", ifelse(icc_RQ_above385$value > 0.91, "excellent"))))
+
+
+
+
+## D) BA-analysis from package BlandAltmanLeh 
+bland.altman.plot(time_above_385$count_Trec, time_above_385$count_Tcore_torso,
+                  main="Bland Altman Plot",
+                  xlab="Means", ylab="Differences", silent=FALSE)
+
+BAresult_RQ_above385 <- bland.altman.stats(time_above_385$count_Trec, time_above_385$count_Tcore_torso,
+                               two = 1.96, mode = 1, conf.int = 0.95)
+
+
+# STEP Y) Criterion validity CORE vs REC ----
+## C) ICC from package irr
+icc_RQ_validity_Tc <- icc(cbind(Masterfile$Trec, Masterfile$T_core_torso_new),
+           model="twoway", type="agreement", unit="single")
+
+icc_inter_RQ_validity_Tc <- ifelse(icc_RQ_validity_Tc$value < 0.49, "poor", 
+                                ifelse(icc_RQ_validity_Tc$value > 0.5 & icc_RQ_validity_Tc$value < 0.75, "moderate", ifelse(icc_RQ_validity_Tc$value > 0.76 & icc_RQ_validity_Tc$value < 0.9, "good", ifelse(icc_RQ_validity_Tc$value > 0.91, "excellent"))))
+
+icc_RQ_validity_Tsk <- icc(cbind(Masterfile$Tsk_average, Masterfile$T_skin_torso),
+           model="twoway", type="agreement", unit="single")
+
+icc_inter_RQ_validity_Tsk <- ifelse(icc_RQ_validity_Tsk$value < 0.49, "poor", 
+                                ifelse(icc_RQ_validity_Tsk$value > 0.5 & icc_RQ_validity_Tsk$value < 0.75, "moderate", ifelse(icc_RQ_validity_Tsk$value > 0.76 & icc_RQ_validity_Tsk$value < 0.9, "good", ifelse(icc_RQ_validity_Tsk$value > 0.91, "excellent"))))
+
+
+
+## D) BA-analysis from package BlandAltmanLeh 
+bland.altman.plot(Masterfile$Trec, Masterfile$T_core_torso_new,
+                  main="Bland Altman Plot: Trec vs CORE_torso",
+                  xlab="Means", ylab="Differences", silent=FALSE)
+
+BAresult_RQ_validity_Tc <- bland.altman.stats(Masterfile$Trec, Masterfile$T_core_torso_new, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+BAresult_RQ_validity_Tsk <- bland.altman.stats(Masterfile$Tsk_average, Masterfile$T_skin_torso, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+bland.altman.plot(Masterfile$Trec[Masterfile$Minutes < 45], Masterfile$T_core_torso_new [Masterfile$Minutes < 45],
+                  main="Bland Altman Plot: Trec vs CORE_torso first 45m",
+                  xlab="Means", ylab="Differences", silent=FALSE)
+
+bland.altman.plot(Masterfile$Trec[Masterfile$Minutes > 45], Masterfile$T_core_torso_new [Masterfile$Minutes > 45],
+                  main="Bland Altman Plot: Trec vs CORE_torso interval part",
+                  xlab="Means", ylab="Differences", silent=FALSE)
+
+BAresult_RQ_validity_Tc <- bland.altman.stats(Masterfile$Trec, Masterfile$T_core_torso_new, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+BAresult_RQ_validity_Tsk <- bland.altman.stats(Masterfile$Tsk_average, Masterfile$T_skin_torso, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+# STEP Z) Criterion validity TORSO VS WRIST ----
+## C) ICC from package irr
+icc_RQ_validity_Tc_torso_wrist <- icc(cbind(Masterfile$T_core_torso_new, Masterfile$T_core_hand_new),
+           model="twoway", type="agreement", unit="single")
+
+icc_inter_RQ_validity_Tc_torso_wrist <- ifelse(icc_RQ_validity_Tc_torso_wrist$value < 0.49, "poor", ifelse(icc_RQ_validity_Tc_torso_wrist$value > 0.5 & icc_RQ_validity_Tc_torso_wrist$value < 0.75, "moderate", ifelse(icc_RQ_validity_Tc_torso_wrist$value > 0.76 & icc_RQ_validity_Tc_torso_wrist$value < 0.9, "good", ifelse(icc_RQ_validity_Tc_torso_wrist$value > 0.91, "excellent"))))
+
+icc_RQ_validity_Tsk_torso_wrist <- icc(cbind(Masterfile$T_skin_torso, Masterfile$T_skin_hand),
+           model="twoway", type="agreement", unit="single")
+
+icc_inter_RQ_validity_Tsk_torso_wrist <- ifelse(icc_RQ_validity_Tsk_torso_wrist$value < 0.49, "poor", 
+                                ifelse(icc_RQ_validity_Tsk_torso_wrist$value > 0.5 & icc_RQ_validity_Tsk_torso_wrist$value < 0.75, "moderate", ifelse(icc_RQ_validity_Tsk_torso_wrist$value > 0.76 & icc_RQ_validity_Tsk_torso_wrist$value < 0.9, "good", ifelse(icc_RQ_validity_Tsk_torso_wrist$value > 0.91, "excellent"))))
+
+
+
+## D) BA-analysis from package BlandAltmanLeh 
+bland.altman.plot(Masterfile$T_core_torso_new, Masterfile$T_core_hand_new,
+                  main="Bland Altman Plot: Torso vs Wrist",
+                  xlab="Means", ylab="Differences (torso-wrist)", silent=FALSE)
+
+BAresult_RQ_validity_Tc_torso_wrist <- bland.altman.stats(Masterfile$T_core_torso_new, Masterfile$T_core_hand_new, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+BAresult_RQ_validity_Tsk_torso_wrist <- bland.altman.stats(Masterfile$T_skin_torso, Masterfile$T_skin_hand, two = 1.96, mode = 1, conf.int = 0.95)
+
+
+
+```
+
+## Additional info (not for paper)
+
+Within this section I highlight some additional information for us, as team, to discuss.
+
+### First, we start with all the 1-minute averaged data of Trec, Tcore, Tsk, HR.
+
+```{r}
+#| echo: false
+#| warning: false
+publication_theme <- function() {
+
+  theme_bw() +
+
+    theme(
+
+      panel.grid = element_blank(),
+
+      #text = element_text(size = 40),
+
+      axis.line = element_line(linewidth = 2, color = "#066666"),
+
+      panel.border = element_blank(),
+
+      #title =  element_text(size = 40), # Adjust  title size
+
+      axis.title = element_text(size = 25), # Adjust axis title size
+
+      axis.text = element_text(size = 20),  # Adjust axis text size
+
+      axis.ticks = element_line(size = 1.2),  # Adjust axis tick thickness
+
+      axis.ticks.length = unit(0.3, "cm"), # Adjust tick length here
+
+      plot.title = element_text(size = 18, margin = margin(b = 20)),
+
+      legend.text = element_text(size = 10), # Adjust legend text size
+
+      legend.title = element_text(size = 15),  # Adjust legend title size
+
+      legend.key.size = unit(0.7, "cm"))   # Adjust overall legend size)
+
+}
+
+colorblind_colors <- c("rec" = "#D55E00", "core" = "#0072B2")
+
+colorblind_colors_skin <- c("ib" = "#D55E00", "core" = "#0072B2")
+
+plotvariable <- "Trec"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+
+```
+
+p25 is the one with the very high Trec. Most of the low Trec after min 50 are p7, who was incapable of cycling enough.
+
+```{r}
+#| echo: false
+#| warning: false
+
+plotvariable <- "T_core_torso_new"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+
+```
+
+```{r}
+#| echo: false
+#| warning: false
+
+plotvariable <- "T_core_hand_new"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+
+```
+
+Both torso and hand show very low values sometimes. Not sure why. For now I leave it in.
+
+```{r}
+#| echo: false
+#| warning: false
+plotvariable <- "HR_polar"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+
+```
+
+After removal of the very low HR values, there only are some low values left towards the end of the protocol. I suggest to leave it in because, at that time people might be sitting (so not cycling) for a long time already.
+
+```{r}
+#| echo: false
+#| warning: false
+plotvariable <- "Tsk_average"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+```
+
+Some people start with cold skins, but this is very possible given the relatively cold lab outside of the climatic chamber. The drop somewhere before 50 represents the brief period that participants were out of the climatic chamber. The drops at 75 and 100 might be that someone stepped outside for a short period of time. I have left this data in for now.
+
+```{r}
+#| echo: false
+#| warning: false
+plotvariable <- "T_skin_torso"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+```
+
+```{r}
+#| echo: false
+#| warning: false
+plotvariable <- "T_skin_hand"
+
+total_samples <- sum(!is.na(Masterfile[[plotvariable]]))
+
+Masterfile %>%
+
+  ggplot(aes_string(x = "Minutes", y = plotvariable)) +
+
+  geom_point(alpha = 0.5, size = 3.0, color = "#D55E00") +
+
+  publication_theme() +
+
+  annotate("text", x = Inf, y = Inf, label = paste("N:", total_samples),
+
+           hjust = 1.1, vjust = 1.1, size = 5, color = "black") +
+
+  labs(title = plotvariable)
+```
+
+Same goes for the skin temperatures measured by the CORE sensor, sometimes start low.
+
+### Second, which to exclude?
+
+As 2 participants dropped-out after 2 and 5 sessions due to injury (knee, p3) and sickness (maagzuur, p4), 16 participants finished the entire HA-protocol. One participant kept changing power output during the exercise phase and is therefore excluded (p18). Due to measurement error using the rectal probe (very high values, see figure Trec) , HA-1 for pp25 had to be excluded from Tc related research questions involving HA1 (Main research questions about HA-adaptations). Due to measurement error in CORE during HA1, p16 and p20 have to be excluded from Tc related research questions involving HA1 (Main research questions about HA-adaptations).
+
+This leaves 12 participants who might be included in the mixed-models ANOVA.
+
+Additionally, after calculation of Tc averages for the resting and constant cycling phase, 4 participants had one (N = 3) or two (N = 1) missing values for one of the measurement devices due to measurement error. I propose to replace the missing value with the average of the HA-session before and after the missing session. This causes the sample size for this research question to be 12 (instead of 8). ***Do we agree on this method?***
+
+One participant (pp7) did not reach Tre \> 38.5 any day. I suggest excluding here from the time \> 38.5 RQ. Interestingly she did show large changes in resting (-0.6 a -0.7) and exercising (-0.5) Tre.
+
+For the other research questions, where we have only Blant-Altman analysis and ICC, I suggest to use all the available data. That includes the drop-outs. Because why not? More data = more better ;)
+
+### Third, Normality of data.
+
+We have very large sample sizes (see graphs) for the RQ regarding wrist vs torso and overall validity, therefore we can assume normality in those cases. However, for the main research question and the time \> 38.5 degr C question our sample is small (N = 9 or 14, see above) and moderate (N \> 50) so we have to check.
+
+Below are the results of my visual inspection of data normality. We have rest and ex(ercising) data which is Y(es) or N(ot) normaly distributed. There are some sessions which are not normaly distributed. However, in general, data is normally distributed. Therefore, I conclude we can proceed with parametric tests. ***do you agree?***
+
+***dTre: rest & ex YES (excl pp25) - ALL DATA*** -
+
+-   rest Y: HA2,4-9 -
+
+-   rest N: HA3 -
+
+-   ex Y: HA2-9
+
+***dTCore_torso: rest & ex YES (excl pp25) - ALL DATA*** -
+
+-   rest Y: HA2-9 -
+
+-   ex Y: HA2-4,7 -
+
+-   ex N: HA5, 6, 8, 9
+
+***dTCore_hand: rest & ex NO (excl pp25)*** -
+
+-   rest Y: HA2-7
+
+-   rest N: HA8,9
+
+-   ex N: HA2, 5-8
+
+-   ex N: HA3, 4, 9
+
+## HA-adaptations
+
+The assumption of sphericity was violated for dTc during rest (W = `r ANOVA_results_dTc_rest$"Mauchly's Test for Sphericity"[2,2]`, P = ANOVA_results_dTc_rest$"Mauchly's Test for Sphericity"[2,3]`), therefore Greenhouse-Geisser corrected values are reported for dTc during resting. A significant interaction effect of HA and Device on dTc during rest was found, F(`r ANOVA_results_dTc_rest$"Sphericity Corrections"\[2,3\]`) =`r round(ANOVA_results_dTc_rest$ANOVA[3,4], digits = 2)` , P = `r round(ANOVA_results_dTc_rest$"Sphericity Corrections"\[2,4\], digits = 10)`, ges =`r round(ANOVA_results_dTc_rest\$ANOVA\[3,7\], digits = 2)\`. No significant interaction was found on dTc during exercise. A significant main effect of HA on dTc during rest and exercise was found (P \< 0.05).
+
+Specifically, dTc in rest measured using the rectal probe was significantly reduced for HA8 (t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[15], digits = 4)`) and HA9 ((t(`r round(summary(pairwise_comparisons_ha_dTc_rest)$df[16], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_rest)$t.ratio[16], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_rest)$p.value[16], digits = 4)`)) when compared to HA1, while the dTc in rest estimated using the CRS did not significantly change throughout the HA-protocol. Additionally, dTc during exercise measured using the rectal probe was significantly reduced for HA7 (t(`r round(summary(pairwise_comparisons_ha_dTc_ex)$df[14], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_ex)$t.ratio[14], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_ex)$p.value[14], digits = 4)`) , HA8 (t(`r round(summary(pairwise_comparisons_ha_dTc_ex)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_ex)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_ex)$p.value[15], digits = 4)`) and HA9 ((t(`r round(summary(pairwise_comparisons_ha_dTc_ex)$df[16], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTc_ex)$t.ratio[16], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTc_ex)$p.value[16], digits = 4)`)) when compared to HA1, while the dTc during exercise estimated using the CRS did not significantly change throughout the HA-protocol.
+
+```{r}
+#| echo: false
+# 
+# Additionally, dTsk during exercise measured using the IB was significantly reduced for HA6 ((t(`r round(summary(pairwise_comparisons_ha_dTsk_ex)$df[13], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$t.ratio[13], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$p.value[13], digits = 4)`)) and HA8 ((t(`r round(summary(pairwise_comparisons_ha_dTsk_ex)$df[15], digits = 0)`) = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$t.ratio[15], digits = 2)` , P = `r round(summary(pairwise_comparisons_ha_dTsk_ex)$p.value[15], digits = 4)`)) when compared to HA1, while the dTsk during exercise estimated using the CRS did not change throughout the HA-protocol. Surprisingly, no significant change was seen in dTsk during rest estimated using the IB (or CRS).
+
+knitr::kable(results_df_mmANOVA, col.names = c("Variable", "Interaction", "Main effect HA"))
+```
+
+```{r}
+#| echo: false
+#| warning: false
+
+
+long_dTc_rest %>%
+  filter(!(pp == 25)) %>%
+  ggplot(aes(x = ha)) +
+  geom_point(aes(y = value, color = device), position = position_nudge(x = long_dTc_rest$nudge_x), alpha = 0.5, size = 2.0) +
+  geom_line(data = mean_values_dTc_rest, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTc_rest$nudge_x), size = 1.5) +
+  geom_point(data = mean_values_dTc_rest, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTc_rest$nudge_x), size = 4, shape = 4, stroke = 2) +
+  scale_color_manual(values = colorblind_colors) +
+  publication_theme() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend inside plot
+        legend.justification = c("right", "top")) + 
+  labs(title = "dTc rest all values & mean",
+       x = "HA-session",
+       y = "dTc in rest",
+       color = "Device")
+
+long_dTc_rest %>%
+  ggplot(aes(x = ha, y = value, group = interaction(pp, device), color = device)) +
+  geom_line(size = 1.5) +
+  geom_hline(yintercept = 0, alpha = 0.6) +
+  publication_theme() +
+  scale_color_manual(values = colorblind_colors)+
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend inside plot
+        legend.justification = c("right", "top")) + 
+  labs(title = "dTc rest individual lines",
+       x = "HA-session",
+       y = "dTc exercise",
+       color = "Device")
+
+
+long_dTsk_rest %>%
+  #filter(!(pp == 25)) %>%
+  ggplot(aes(x = ha)) +
+  geom_point(aes(y = value, color = device), position = position_nudge(x = long_dTsk_rest$nudge_x), alpha = 0.5, size = 2.0) +
+  geom_line(data = mean_values_dTsk_rest, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTsk_rest$nudge_x), size = 1.5) +
+  geom_point(data = mean_values_dTsk_rest, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTsk_rest$nudge_x), size = 4, shape = 4, stroke = 2) +
+  scale_color_manual(values = colorblind_colors_skin) +
+  publication_theme() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend inside plot
+        legend.justification = c("right", "top")) + 
+  labs(title = "dTsk rest all data & mean",
+       x = "HA-session",
+       y = "dTsk in rest",
+       color = "Device")
+
+
+
+### EXERCSING core and skin
+long_dTc_ex %>%
+  filter(!(pp == 25)) %>%
+  ggplot(aes(x = ha)) +
+  geom_point(aes(y = value, color = device), position = position_nudge(x = long_dTc_ex$nudge_x), alpha = 0.5, size = 2.0) +
+  geom_line(data = mean_values_dTc_ex, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTc_ex$nudge_x), size = 1.5) +
+  geom_point(data = mean_values_dTc_ex, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTc_ex$nudge_x), size = 4, shape = 4, stroke = 2) +
+  scale_color_manual(values = colorblind_colors) +
+  publication_theme() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend inside plot
+        legend.justification = c("right", "top")) + 
+  labs(title = "dTc EX all data & mean",
+       x = "HA-session",
+       y = "dTc in exercise",
+       color = "Device")
+
+long_dTc_ex %>%
+  ggplot(aes(x = ha, y = value, group = interaction(pp, device), color = device)) +
+  geom_line(size = 1.5) +
+  geom_hline(yintercept = 0, alpha = 0.8) +
+  publication_theme() +
+  scale_color_manual(values = colorblind_colors)+
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend inside plot
+        legend.justification = c("right", "top")) + 
+  labs(title = "dTc EX individual lines",
+       x = "HA-session",
+       y = "dTc exercise",
+       color = "Device")
+
+long_dTsk_ex %>%
+  #filter(!(pp == 25)) %>%
+  ggplot(aes(x = ha)) +
+  geom_point(aes(y = value, color = device), position = position_nudge(x = long_dTsk_ex$nudge_x), alpha = 0.5, size = 2.0) +
+  geom_line(data = mean_values_dTsk_ex, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTsk_ex$nudge_x), size = 1.5) +
+  geom_point(data = mean_values_dTsk_ex, aes(y = value, color = device, group = device), position = position_nudge(x = mean_values_dTsk_ex$nudge_x), size = 4, shape = 4, stroke = 2) +
+  scale_color_manual(values = colorblind_colors_skin) +
+  publication_theme() +
+  theme(panel.grid = element_blank(),
+        legend.position = c(0.99, 0.99),  # Position legend inside plot
+        legend.justification = c("right", "top")) + 
+  labs(title = "dTsk EX all data & mean",
+       x = "HA-session",
+       y = "dTsk in ex",
+       color = "Device")
+
+```
+
+The ICC, mean bias and lower- and upper limit of dTc and dTsk measured by the golden standard (rectal probe and IB) and CRS are presented in the table below. The Bland-Altman plots are displayed in figure X.
+
+```{r}
+#| echo: false
+
+knitr::kable(results_df, col.names = c("Variable", "Mean Diffs", "Lower Limit", "Upper Limit", "ICC Value", "ICC Interpretation"))
+```
+
+```{r}
+#| echo: false
+
+#par(mfrow = c(2,2))
+
+plot1 <- bland.altman.plot(Changes_overHA$dTc_rec_rest_mean, Changes_overHA$dTc_core_torso_rest_mean,
+                           main="dTc rest adaptations", xlab="Means", ylab="Differences (rec-core)", silent=TRUE)
+plot2 <- bland.altman.plot(Changes_overHA$dTc_rec_ex_mean, Changes_overHA$dTc_core_torso_ex_mean,
+                           main="dTc ex adaptations", xlab="Means", ylab="", silent=TRUE)
+plot3 <- bland.altman.plot(Changes_overHA$dTsk_ib_rest_mean, Changes_overHA$dTsk_core_torso_rest_mean,
+                           main="dTsk rest adaptations", xlab="Means", ylab="Differences (rec-core)", silent=TRUE)
+plot4 <- bland.altman.plot(Changes_overHA$dTsk_ib_ex_mean, Changes_overHA$dTsk_core_torso_ex_mean,
+                           main="dTsk ex adaptations", xlab="Means", ylab="", silent=TRUE)
+
+# print(plot1)
+# print(plot2)
+# print(plot3)
+# print(plot4)
+```
+
+## Time spend above 38.5
+
+One participants did not spend any time with a Tre \> 38.5 and was therefore excluded from the analysis. The average time spend with a Tre at or above 38.5 was `r round(time_above$averagetime, digits = 0)` +/- `r round(time_above$sdtime, digits = 0)` min.
+
+The ICC of the time spend above 38.5 is `r round(icc_RQ_above385$value, digits = 2)` (95% CI: `r round(icc_RQ_above385$lbound, digits = 2)`-`r round(icc_RQ_above385$ubound, digits = 2)`), F(`r round(icc_RQ_above385$df1, digits = 1)`, `r round(icc_RQ_above385$df2, digits = 1)`) = `r round(icc_RQ_above385$Fvalue, digits = 2)`, p = `r round(icc_RQ_above385$p.value, digits = 10)`, indicating `r icc_inter_RQ_above385` reliability. The Bland-Altman plot is shown below. The mean bias was `r round(BAresult_RQ_above385$mean.diffs, digits = 0)` min with limits of agreement from `r round(BAresult_RQ_above385$lower.limit, digits = 0)` to `r round(BAresult_RQ_above385$upper.limit, digits = 0)` min. The negative value of the mean bias indicates that the CRS typically overestimated the time spend above 38.5 compared to the rectal probe.
+
+```{r}
+#| echo: false
+bland.altman.plot(time_above_385$count_Trec, time_above_385$count_Tcore_torso,
+                  main="Bland Altman Plot: time spend above 38.5", xlab="Means", ylab="Differences (rec-core)", silent=T)
+
+```
+
+## Criterion validity CORE vs REC
+
+The average Tc profile for the CRS and rectal probe are presented in the figure below.
+
+```{r}
+#| echo: false
+#| #| warning: false
+long_Masterfile %>%
+  ggplot(aes(x = Minutes, y = value, color = device)) +
+  stat_summary(fun = mean, geom = "line", aes(group = device), size = 2) +
+  stat_summary(fun.data = mean_cl_normal, geom = "ribbon", aes(fill = device), alpha = 0.5, color = NA)  +
+  publication_theme() +
+  labs(title = "Average Rec and CORE over all sessions",
+       y = "Tc (C)",
+       x = "Time (min)")
+
+mean_values_Tc %>%
+  ggplot(aes(x = Minutes, y = value, color = device)) +
+  geom_point(alpha = 0.5, size = 3.0) +
+  publication_theme() +
+  labs(title = "Average Rec and CORE over all sessions",
+       y = "Tc (C)",
+       x = "Time (min)")
+```
+
+The ICC of the CRS to estimate Tc compared to the rectal probe is `r round(icc_RQ_validity_Tc$value, digits = 2)` (95% CI: `r round(icc_RQ_validity_Tc$lbound, digits = 2)`-`r round(icc_RQ_validity_Tc$ubound, digits = 2)`), F(`r round(icc_RQ_validity_Tc$df1, digits = 1)`, `r round(icc_RQ_validity_Tc$df2, digits = 1)`) = `r round(icc_RQ_validity_Tc$Fvalue, digits = 2)`, p = `r round(icc_RQ_validity_Tc$p.value, digits = 10)`, indicating `r icc_inter_RQ_validity_Tc` reliability. The Bland-Altman plot is shown below. The mean bias was `r round(BAresult_RQ_validity_Tc$mean.diffs, digits = 2)` C with limits of agreement from `r round(BAresult_RQ_validity_Tc$lower.limit, digits = 2)` to `r round(BAresult_RQ_validity_Tc$upper.limit, digits = 2)` C. The negative value of the mean bias indicates that the CRS typically overestimated Tc compared to the rectal probe.
+
+The ICC of the CRS to estimate Tsk compared to IB is `r round(icc_RQ_validity_Tsk$value, digits = 2)` (95% CI: `r round(icc_RQ_validity_Tsk$lbound, digits = 2)`-`r round(icc_RQ_validity_Tsk$ubound, digits = 2)`), F(`r round(icc_RQ_validity_Tsk$df1, digits = 1)`, `r round(icc_RQ_validity_Tsk$df2, digits = 1)`) = `r round(icc_RQ_validity_Tsk$Fvalue, digits = 2)`, p = `r round(icc_RQ_validity_Tsk$p.value, digits = 10)`, indicating `r icc_inter_RQ_validity_Tsk` reliability. The Bland-Altman plot is shown below. The mean bias was `r round(BAresult_RQ_validity_Tsk$mean.diffs, digits = 2)` C with limits of agreement from `r round(BAresult_RQ_validity_Tsk$lower.limit, digits = 2)` to `r round(BAresult_RQ_validity_Tsk$upper.limit, digits = 2)` C. The negative value of the mean bias indicates that the CRS typically overestimated Tsk compared to IB.
+
+```{r}
+#| echo: false
+
+# par(mfrow = c(1,2))
+
+plot1 <- bland.altman.plot(Masterfile$Trec, Masterfile$T_core_torso_new,
+                  main="BA-plot: criterion validity Tc", xlab="Means Tc", ylab="Differences Tc (rec-core)", silent=T)
+ 
+
+plot2 <- bland.altman.plot(Masterfile$Tsk_average, Masterfile$T_skin_torso,
+                  main="Tsk", xlab="Means Tsk", ylab="Differences Tsk (rec-core)", silent=T)
+
+print(plot1)
+print(plot2)
+
+```
+
+## Criterion validity torso vs wrist
+
+The ICC of the CRS on the wrist to estimate Tc compared to the CRS on the torso is `r round(icc_RQ_validity_Tc_torso_wrist$value, digits = 2)` (95% CI: `r round(icc_RQ_validity_Tc_torso_wrist$lbound, digits = 2)`-`r round(icc_RQ_validity_Tc_torso_wrist$ubound, digits = 2)`), F(`r round(icc_RQ_validity_Tc_torso_wrist$df1, digits = 1)`, `r round(icc_RQ_validity_Tc_torso_wrist$df2, digits = 1)`) = `r round(icc_RQ_validity_Tc_torso_wrist$Fvalue, digits = 2)`, p = `r round(icc_RQ_validity_Tc_torso_wrist$p.value, digits = 10)`, indicating `r icc_inter_RQ_validity_Tc_torso_wrist` reliability. The Bland-Altman plot is shown below. The mean bias was `r round(BAresult_RQ_validity_Tc_torso_wrist$mean.diffs, digits = 2)` C with limits of agreement from `r round(BAresult_RQ_validity_Tc_torso_wrist$lower.limit, digits = 2)` to `r round(BAresult_RQ_validity_Tc_torso_wrist$upper.limit, digits = 2)` C. The negative value of the mean bias indicates that the CRS on the wrist typically overestimated Tc compared to the CRS on the torso.
+
+The ICC of the CRS to estimate Tsk compared to IB is `r round(icc_RQ_validity_Tsk_torso_wrist$value, digits = 2)` (95% CI: `r round(icc_RQ_validity_Tsk_torso_wrist$lbound, digits = 2)`-`r round(icc_RQ_validity_Tsk_torso_wrist$ubound, digits = 2)`), F(`r round(icc_RQ_validity_Tsk_torso_wrist$df1, digits = 1)`, `r round(icc_RQ_validity_Tsk_torso_wrist$df2, digits = 1)`) = `r round(icc_RQ_validity_Tsk_torso_wrist$Fvalue, digits = 2)`, p = `r round(icc_RQ_validity_Tsk_torso_wrist$p.value, digits = 10)`, indicating `r icc_inter_RQ_validity_Tsk_torso_wrist` reliability. The Bland-Altman plot is shown below. The mean bias was `r round(BAresult_RQ_validity_Tsk_torso_wrist$mean.diffs, digits = 2)` C with limits of agreement from `r round(BAresult_RQ_validity_Tsk_torso_wrist$lower.limit, digits = 2)` to `r round(BAresult_RQ_validity_Tsk_torso_wrist$upper.limit, digits = 2)` C. The positive value of the mean bias indicates that the CRS on the wrist typically underestimated Tsk compared to CRS on the torso.
+
+```{r}
+#| echo: false
+
+bland.altman.plot(Masterfile$T_core_torso_new, Masterfile$T_core_hand_new,
+                  main="BA-plot: Tc torso vs wrist", xlab="Means Tc", ylab="Differences Tc (torso-hand)", silent=T)
+
+bland.altman.plot(Masterfile$T_skin_torso, Masterfile$T_skin_hand,
+                  main="BA-plot: Tsk torso vs wrist", xlab="Means Tsk", ylab="Differences Tsk (torso-hand)", silent=T)
+
+```
